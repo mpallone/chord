@@ -9,6 +9,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"github.com/robcs621/proj2/chord"
 	"io/ioutil"
 	"log"
 	"net"
@@ -31,7 +32,7 @@ type ServerConfiguration struct {
 	Methods []string
 }
 
-type Server int
+type Node int
 
 type TripKey string
 type TripRel string
@@ -65,7 +66,7 @@ type ListIDsReply struct {
 var dict = map[KeyRelPair]TripVal{}
 
 // LOOKUP(keyA, relationA)
-func (t *Server) Lookup(args *Args, reply *LookupReply) error {
+func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
 	fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
@@ -85,7 +86,7 @@ func (t *Server) Lookup(args *Args, reply *LookupReply) error {
 }
 
 // INSERT(keyA, relationA, valA)
-func (t *Server) Insert(args *Args, reply *InsertReply) error {
+func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
 	fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
@@ -105,7 +106,7 @@ func (t *Server) Insert(args *Args, reply *InsertReply) error {
 }
 
 // INSERTORUPDATE(keyA, relA, valA)
-func (t *Server) InsertOrUpdate(args *Args, reply *string) error {
+func (t *Node) InsertOrUpdate(args *Args, reply *string) error {
 
 	fmt.Print("  InsOrUpd: ", args.Key, ", ", args.Rel, ", ", args.Val)
 
@@ -120,7 +121,7 @@ func (t *Server) InsertOrUpdate(args *Args, reply *string) error {
 }
 
 // DELETE(keyA, relA)
-func (t *Server) Delete(args *Args, reply *string) error {
+func (t *Node) Delete(args *Args, reply *string) error {
 
 	fmt.Print("  Delete:     ", args.Key, ", ", args.Rel)
 
@@ -133,7 +134,7 @@ func (t *Server) Delete(args *Args, reply *string) error {
 }
 
 // LISTKEYS()
-func (t *Server) ListKeys(args *Args, reply *ListKeysReply) error {
+func (t *Node) ListKeys(args *Args, reply *ListKeysReply) error {
 
 	fmt.Println("  ListKeys ")
 
@@ -153,7 +154,7 @@ func (t *Server) ListKeys(args *Args, reply *ListKeysReply) error {
 }
 
 // LISTIDs()
-func (t *Server) ListIDs(args *Args, reply *ListIDsReply) error {
+func (t *Node) ListIDs(args *Args, reply *ListIDsReply) error {
 
 	fmt.Println("  ListIDs")
 
@@ -166,7 +167,7 @@ func (t *Server) ListIDs(args *Args, reply *ListIDsReply) error {
 }
 
 // SHUTDOWN()
-func (t *Server) Shutdown(args *Args, reply *string) error {
+func (t *Node) Shutdown(args *Args, reply *string) error {
 
 	fmt.Println("  Shutting down ... ")
 	os.Exit(0)
@@ -185,6 +186,9 @@ func main() {
 	fmt.Println("Loading server configuration...")
 	parseConfigurationFile(infile)
 
+	// display this node's ID based on SHA-1 hash value
+	fmt.Printf("Chord Node ID: % x\n", chord.GetNodeID(conf.IpAddress+":"+conf.Port))
+
 	// open persistent storage container
 	fmt.Println("Accessing DICT3 persistent storage...")
 	openPersistentStorageContainer(conf.PersistentStorageContainer.File)
@@ -195,7 +199,7 @@ func main() {
 	checkErrorCondition(err)
 
 	// register procedure call
-	rpc.Register(new(Server))
+	rpc.Register(new(Node))
 
 	listener, err := net.ListenTCP(conf.Protocol, tcpAddr)
 	checkErrorCondition(err)
@@ -253,8 +257,6 @@ func openPersistentStorageContainer(pathToStorageContainer string) {
 	for k, v := range dict {
 		fmt.Println("    ", k, v)
 	}
-
-	// no need to keep file open until write back to disk at server shutdown
 	storageFile.Close()
 }
 

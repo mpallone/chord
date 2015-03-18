@@ -48,9 +48,9 @@ func main() {
 	var inputStr string
 	fmt.Println("===============================================================================================================")
 	fmt.Println("JSON messages entered must:")
-	fmt.Println(` -specify Server.[method name] in the "method" field`)
+	fmt.Println(` -specify Node.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
-	fmt.Println(`Example: {"method":"Server.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
+	fmt.Println(`Example: {"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 	for {
@@ -59,7 +59,7 @@ func main() {
 		inputStr, err = rdr.ReadString('\n')
 		checkErrorCondition(err)
 
-		// send JSON message to server
+		// send JSON message to node
 		fmt.Fprintf(conn, inputStr)
 		responseFromServer, err := bufio.NewReader(conn).ReadString('\n')
 		checkErrorCondition(err)
