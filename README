@@ -1,0 +1,32 @@
+Follow the Go installation instructions:
+https://golang.org/doc/install
+
+make sure 'echo $GOPATH' displays $HOME/go
+e.g., /home/rrr/go
+
+Create the following directory structure:
+$HOME/go/src/github.com/robcs621/
+
+# Example on my computer, your home directory will differ from mine (rrr) obviously:
+
+# from the robcs621 directory:
+/home/rrr/go/src/github.com/robcs621 ~] git clone https://github.com/robcs621/proj2.git
+/home/rrr/go/src/github.com/robcs621 ~] cd proj2
+
+# make sure scripts are executable 
+/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x create_test_nodes.sh
+/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x start_test_nodes_and_client.sh
+/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x client/run_client.sh
+
+# after running the following script, you should have 4 test_node directories 
+/home/rrr/go/src/github.com/robcs621/proj2 ~]./create_test_nodes.sh
+
+# now start 4 test_nodes and the client (the number of nodes can be changed easily at the top of both scripts)
+/home/rrr/go/src/github.com/robcs621/proj2 ~]./start_test_nodes_and_client.sh
+
+# to run all of the sample test messages at once, close out only the CLIENT terminal window and then do the following:
+# (the client will connect to test_node1, based on the port currently in the client.config, which can be changed)
+/home/rrr/go/src/github.com/robcs621/proj2 ~] cd client/
+/home/rrr/go/src/github.com/robcs621/proj2/client ~] go run client.go client.config < sample_input/client_test_messages.txt 
+
+
