@@ -1,6 +1,13 @@
 Follow the Go installation instructions:
 https://golang.org/doc/install
 
+Create the following Profile in gnome-terminal:
+Terminal -> Edit -> Profiles...
+Click "New"
+Profile name: HOLD_OPEN (leave 'Base on:' set as 'Default')
+In the "Title and Command" tab: Set the 'When command exits:' to "Hold the terminal open"
+Save this profile
+
 make sure 'echo $GOPATH' displays $HOME/go
 e.g., /home/rrr/go
 
