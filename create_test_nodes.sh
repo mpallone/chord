@@ -5,13 +5,15 @@ NUM_TEST_NODES_TO_CREATE=4
 REAL_NODE_FILE=node/node.go
 TEST_NODE_DIR=test_node
 
-echo "Creating ${NUM_TEST_NODES_TO_CREATE} test nodes..."
+echo "Deleting old test nodes..."
+rm -rf "${TEST_NODE_DIR}"*
+
+echo "Creating ${NUM_TEST_NODES_TO_CREATE} new test nodes..."
 
 for ((node_num=$START; node_num<=$NUM_TEST_NODES_TO_CREATE; node_num++))
 do
-	echo "Cleaning old ${TEST_NODE_DIR}${node_num} directory and creating new one"
-	rm -rf ${TEST_NODE_DIR}${node_num}
-
+	echo "Building new ${TEST_NODE_DIR}${node_num}"
+	
 	mkdir ${TEST_NODE_DIR}${node_num}
 
 	# relative path for .go and .config
