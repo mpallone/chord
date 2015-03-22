@@ -39,7 +39,7 @@ func main() {
 	parseConfigurationFile(infile)
 
 	// connect to remote server
-	fmt.Print("Connecting to ", conf.ServerID, " at ", conf.IpAddress, " ... ")
+	fmt.Print("Establishing connection to ", conf.IpAddress, ":", conf.Port, " ... ")
 	conn, err := net.Dial(conf.Protocol, (conf.IpAddress + ":" + conf.Port))
 	checkErrorCondition(err)
 	fmt.Println("Success!")
@@ -83,11 +83,9 @@ func parseConfigurationFile(infile string) {
 	err = json.Unmarshal(configurationFile, &conf)
 	checkErrorCondition(err)
 
-	fmt.Println("   ServerID: ", conf.ServerID)
 	fmt.Println("   Protocol: ", conf.Protocol)
 	fmt.Println("   IP Address: ", conf.IpAddress)
 	fmt.Println("   Port: ", conf.Port)
-	fmt.Println("   Methods: ", conf.Methods)
 }
 
 func checkErrorCondition(err error) {
