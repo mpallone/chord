@@ -186,9 +186,6 @@ func main() {
 	fmt.Println("Loading server configuration...")
 	parseConfigurationFile(infile)
 
-	// display this node's ID based on SHA-1 hash value
-	fmt.Printf("Chord Node ID: % x\n", chord.GetNodeID(conf.IpAddress+":"+conf.Port))
-
 	// open persistent storage container
 	fmt.Println("Accessing DICT3 persistent storage...")
 	openPersistentStorageContainer(conf.PersistentStorageContainer.File)
@@ -204,6 +201,17 @@ func main() {
 	listener, err := net.ListenTCP(conf.Protocol, tcpAddr)
 	checkErrorCondition(err)
 	defer listener.Close()
+
+	// display this node's ID based on SHA-1 hash value
+	fmt.Printf("Chord Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
+
+	// bootstrap, first node with port number 7001 creates the ring, and the rest join
+	if conf.Port == "7001" {
+		chord.Create(conf.IpAddress, conf.Port)
+		fmt.Println("Finger Table: ", chord.FingerTable)
+	} else {
+		chord.Join()
+	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
@@ -255,7 +263,9 @@ func openPersistentStorageContainer(pathToStorageContainer string) {
 	dec.Decode(&dict)
 	fmt.Println("   DICT3 contents stored on disk: ")
 	for k, v := range dict {
-		fmt.Println("    ", k, v)
+		var chordKey = string(k.Key) + string(k.Rel)
+		fmt.Print("    ", k, v)
+		fmt.Printf("     Chord Key-Rel ID: %d\n", chord.GetChordID(chordKey))
 	}
 	storageFile.Close()
 }
