@@ -7,7 +7,7 @@ import (
 	"math/big"
 )
 
-type ChordNode struct {
+type ChordNodePtr struct {
 	ChordID   *big.Int
 	IpAddress string
 	Port      string
@@ -15,7 +15,9 @@ type ChordNode struct {
 
 const mBits int = 8
 
-var FingerTable [mBits]ChordNode
+var Predecessor ChordNodePtr
+
+var FingerTable [mBits]ChordNodePtr
 
 func GetChordID(str string) *big.Int {
 	data := []byte(str)
@@ -47,6 +49,23 @@ func Create(ip string, port string) {
 	FingerTable[1].ChordID = GetChordID(ip + ":" + port)
 }
 
-func Join() {
+// parameters ip and port passed in is the existing node's ip address and port
+func Join(existingNodeIP string, existingNodePort string, joiningNodeID *big.Int) {
 	fmt.Println("Joining chord ring...")
+	fmt.Println("Making RPC call to: ", existingNodeIP, ":", existingNodePort)
+
+	// make RPC call to existing node already in chord ring (use Client.Call)
+
+	// joining node updates its fingerTable[1] to have FingerTable[1] = successor
+}
+
+func FindSuccessor(id *big.Int) ChordNodePtr {
+
+	fmt.Println("finding successor of: ", id)
+
+	// TODO add logic for finger table lookup
+
+	// placeholder for the successor once it is found
+	var temp ChordNodePtr
+	return temp
 }

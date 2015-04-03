@@ -12,6 +12,7 @@ import (
 	"github.com/robcs621/proj2/chord"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -47,6 +48,11 @@ type Args struct {
 	Rel TripRel
 	Val TripVal // only used for insert and insertOrUpdate,
 }
+
+type ChordIDArgs struct {
+	Id *big.Int
+}
+
 type LookupReply struct {
 	Key TripKey
 	Rel TripRel
@@ -60,6 +66,9 @@ type ListKeysReply struct {
 }
 type ListIDsReply struct {
 	IDList []KeyRelPair
+}
+type FindSuccessorReply struct {
+	ChordNodePtr chord.ChordNodePtr
 }
 
 // global variable
@@ -174,6 +183,17 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 	return nil
 }
 
+//--------------CHORD WRAPPER METHODS-----------------------------
+func (t *Node) FindSuccessor(args *ChordIDArgs, reply *FindSuccessorReply) error {
+	fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
+
+	reply.ChordNodePtr = chord.FindSuccessor(args.Id)
+
+	return nil
+}
+
+//--------------CHORD WRAPPER METHODS-----------------------------
+
 func main() {
 
 	if len(os.Args) != 2 {
@@ -210,7 +230,8 @@ func main() {
 		chord.Create(conf.IpAddress, conf.Port)
 		fmt.Println("Finger Table: ", chord.FingerTable)
 	} else {
-		chord.Join()
+		// contact CreatedNode and pass in my own chord ID
+		chord.Join("127.0.0.1", "7001", chord.GetChordID(conf.IpAddress+":"+conf.Port))
 	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
