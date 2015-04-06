@@ -5,6 +5,9 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"math/big"
+	"net/rpc"
+	"net/rpc/jsonrpc"
+	"os"
 )
 
 type ChordNodePtr struct {
@@ -14,10 +17,21 @@ type ChordNodePtr struct {
 }
 
 const mBits int = 8
+const SELF int = 0 
 
 var Predecessor ChordNodePtr
 
-var FingerTable [mBits]ChordNodePtr
+var FingerTable [mBits+1]ChordNodePtr
+
+
+// todo - this is a duplicate definition as what's in node.go! 
+type FindSuccessorReply struct {
+	ChordNodePtr ChordNodePtr
+}
+// todo - this is a duplicate definition as what's in node.go! 
+type ChordIDArgs struct {
+	Id *big.Int
+}
 
 
 // Implements the set membership test used by 
@@ -69,6 +83,29 @@ func ComputeMaxKey() *big.Int {
 	return max_key 
 }
 
+// Add one to n, and wrap around if need be. 
+// This is mostly to avoid the ugly big.Int syntax.
+func addOne(n *big.Int) *big.Int {
+	result := big.NewInt(0)
+	result = result.Add(n, big.NewInt(1))
+	max_val := ComputeMaxKey()
+	if result.Cmp(max_val) > 0 {
+		return big.NewInt(0)
+	}
+	return result 
+}
+
+// Subtract one from n, and wrap around if need be. 
+// This is mostly to avoid the ugly big.Int syntax.
+func subOne(n *big.Int) *big.Int {
+	result := big.NewInt(0)
+ 	result = result.Sub(n, big.NewInt(1))
+ 	if result.Cmp(big.NewInt(0)) < 0 {
+ 		return ComputeMaxKey() 
+ 	}
+ 	return result 
+}
+
 func GetChordID(str string) *big.Int {
 	data := []byte(str)
 
@@ -99,7 +136,8 @@ func Create(ip string, port string) {
 	// FingerTable[1].Port = port
 	// FingerTable[1].ChordID = GetChordID(ip + ":" + port)
 
-	for i := mBits - 1; i >= 1; i-- {
+	// Include 0 - let the 0th element point to ourself. 
+	for i := mBits; i >= 0; i-- {
 		FingerTable[i].IpAddress = ip 
 		FingerTable[i].Port = port 
 		FingerTable[i].ChordID = GetChordID(ip + ":" + port)
@@ -107,34 +145,98 @@ func Create(ip string, port string) {
 }
 
 // parameters ip and port passed in is the existing node's ip address and port
-func Join(existingNodeIP string, existingNodePort string, joiningNodeID *big.Int) {
+func Join(existingNodeIP string, existingNodePort string, myIp string, myPort string) {
 	fmt.Println("Joining chord ring...")
 	fmt.Println("Making RPC call to: ", existingNodeIP, ":", existingNodePort)
 
-	// make RPC call to existing node already in chord ring (use Client.Call)
+	// Init the pointer to ourself 
+	FingerTable[SELF].IpAddress = myIp
+	FingerTable[SELF].Port = myPort
+	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
-	// joining node updates its fingerTable[1] to have FingerTable[1] = successor
+
+	// make RPC call to existing node already in chord ring (use Client.Call)
+	service := existingNodeIP + ":" + existingNodePort
+	var client *rpc.Client 
+	client, err := jsonrpc.Dial("tcp", service)
+	if err != nil {
+		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
+		// todo - not sure what to do if a node fails.
+		// Exiting is nice if the node fails, to avoid subtle bugs, 
+		// but the system should be more resilient than that. 
+        os.Exit(1)
+	} 
+
+    var findSuccessorReply FindSuccessorReply
+    var args ChordIDArgs
+    args.Id = FingerTable[SELF].ChordID 
+    err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+   	if err != nil {
+		fmt.Println("ERROR: Join() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("address: ", existingNodeIP, ":", existingNodePort)
+		// todo - Again, probably shouldn't be exiting here. 
+		os.Exit(1)
+	}
+
+	// Set our fingers to point to the successor. 
+	// todo - I think it's actually better to just copy the successors finger table, 
+	//        but I don't feel like implementing that right now, and stabilize() and 
+	//        fix_fingers() should result in correct finger tables eventually. 
+	for i := mBits; i >= 1; i-- {
+		FingerTable[i].IpAddress = findSuccessorReply.ChordNodePtr.IpAddress
+		FingerTable[i].Port = findSuccessorReply.ChordNodePtr.Port 
+		FingerTable[i].ChordID = findSuccessorReply.ChordNodePtr.ChordID 
+	}
+
+	fmt.Println("Finger table at the end of Join():", FingerTable)
+
 }
 
 func FindSuccessor(id *big.Int) ChordNodePtr {
 
 	fmt.Println("finding successor of: ", id)
 
-	// TODO add logic for finger table lookup
+	if Inclusive_in(id, addOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
+		return FingerTable[1]
+	}
 
-	// placeholder for the successor once it is found
-	var temp ChordNodePtr
-	return temp
+	closestPrecedingFinger := closestPrecedingNode(id)
+
+	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
+	var client *rpc.Client
+
+	client, err := jsonrpc.Dial("tcp", service)
+	if err != nil {
+		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
+		// todo - not sure what to do if a node fails.
+		// Exiting is nice if the node fails, to avoid subtle bugs, 
+		// but the system should be more resilient than that. 
+        os.Exit(1)
+	} 
+
+    var findSuccessorReply FindSuccessorReply
+    var args ChordIDArgs
+    args.Id = id 
+	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	if err != nil {
+		fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
+		// todo - Again, probably shouldn't be exiting here. 
+		os.Exit(1)
+	}
+
+	return findSuccessorReply.ChordNodePtr
 }
 
 func closestPrecedingNode(id *big.Int) ChordNodePtr {
-	for i := mBits - 1; i >= 1; i-- {
+
+	for i := mBits; i >= 1; i-- {
+
 		myId := FingerTable[1].ChordID 
 		currentFingerId := FingerTable[i].ChordID 
 
-		if Inclusive_in(currentFingerId, myId, id) {
+		if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
 			return FingerTable[i]
 		}
 	}
-	return FingerTable[1]
+	return FingerTable[SELF]
 }

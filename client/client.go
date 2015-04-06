@@ -51,6 +51,7 @@ func main() {
 	fmt.Println(` -specify Node.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
 	fmt.Println(`Example: {"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
+	fmt.Println(`Example: {"method":"Node.FindSuccessor","params":[{"Id":0}]}`) // todo remove, this is just for convenience
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 	for {

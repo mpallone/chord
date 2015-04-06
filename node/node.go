@@ -189,7 +189,7 @@ func (t *Node) FindSuccessor(args *ChordIDArgs, reply *FindSuccessorReply) error
 
 	reply.ChordNodePtr = chord.FindSuccessor(args.Id)
 
-	return nil
+	return nil 
 }
 
 //--------------CHORD WRAPPER METHODS-----------------------------
@@ -231,7 +231,9 @@ func main() {
 		fmt.Println("Finger Table: ", chord.FingerTable)
 	} else {
 		// contact CreatedNode and pass in my own chord ID
-		chord.Join("127.0.0.1", "7001", chord.GetChordID(conf.IpAddress+":"+conf.Port))
+		//chord.Join("127.0.0.1", "7001", chord.GetChordID(conf.IpAddress+":"+conf.Port))
+		// todo - this hard-coded stuff should really be in the config file 
+		chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port)
 	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
