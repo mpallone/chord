@@ -262,6 +262,7 @@ func main() {
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
 	go periodicallyStabilize() 
+	go chord.FixFingers() 
 
 	for {
 		conn, err := listener.Accept()
@@ -274,6 +275,7 @@ func main() {
 }
 
 func periodicallyStabilize() {
+	// todo - this, and other methods, should probably be using RWLock. 
 	duration, _ := time.ParseDuration("3s")
 	for {
 		time.Sleep(duration)

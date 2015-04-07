@@ -8,6 +8,7 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"time"
 )
 
 type ChordNodePtr struct {
@@ -302,4 +303,26 @@ func Stabilize() {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
 	}
 	client.Close() 
+}
+
+// todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here 
+func FixFingers() {
+	// todo - this, and other methods, should probably be using RWLock. 
+	duration, _ := time.ParseDuration("2s")
+	next := 0
+	for {
+		time.Sleep(duration)
+		next += 1 
+		if next > mBits {
+			next = 1 
+		}
+
+		base := big.NewInt(2)
+		exponent := big.NewInt(int64(next-1))
+		lookupKey := new(big.Int).Add(FingerTable[SELF].ChordID, new(big.Int).Exp(base, exponent, nil))
+
+		FingerTable[next] = FindSuccessor(lookupKey)
+
+		fmt.Println("FixFingers():", FingerTable)
+	}
 }
