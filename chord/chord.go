@@ -32,7 +32,14 @@ type FindSuccessorReply struct {
 type ChordIDArgs struct {
 	Id *big.Int
 }
-
+// todo - this is a duplicate definition as what's in node.go! 
+type NotifyArgs struct {
+	ChordNodePtr ChordNodePtr
+}
+// todo - this is a duplicate definition as what's in node.go! 
+type GetPredecessorReply struct {
+	Predecessor ChordNodePtr
+}
 
 // Implements the set membership test used by 
 // 
@@ -155,7 +162,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
 
-	// make RPC call to existing node already in chord ring (use Client.Call)
+	// make RPC call to existing node already in chord ring (use Client.Call) 
 	service := existingNodeIP + ":" + existingNodePort
 	var client *rpc.Client 
 	client, err := jsonrpc.Dial("tcp", service)
@@ -170,13 +177,14 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
     var findSuccessorReply FindSuccessorReply
     var args ChordIDArgs
     args.Id = FingerTable[SELF].ChordID 
-    err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+    err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply) // Should I be closing this? todo 
    	if err != nil {
 		fmt.Println("ERROR: Join() received an error when calling the Node.FindSuccessor RPC: ", err)
 		fmt.Println("address: ", existingNodeIP, ":", existingNodePort)
 		// todo - Again, probably shouldn't be exiting here. 
 		os.Exit(1)
 	}
+	client.Close() 
 
 	// Set our fingers to point to the successor. 
 	// todo - I think it's actually better to just copy the successors finger table, 
@@ -217,12 +225,13 @@ func FindSuccessor(id *big.Int) ChordNodePtr {
     var findSuccessorReply FindSuccessorReply
     var args ChordIDArgs
     args.Id = id 
-	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply) // Should I be closing this? todo 
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
 		// todo - Again, probably shouldn't be exiting here. 
 		os.Exit(1)
 	}
+	client.Close()
 
 	return findSuccessorReply.ChordNodePtr
 }
@@ -239,4 +248,58 @@ func closestPrecedingNode(id *big.Int) ChordNodePtr {
 		}
 	}
 	return FingerTable[SELF]
+}
+
+// nodePtr thinks it might be our successor
+func Notify(nodePtr ChordNodePtr) {
+	// Need to be careful not to dereference Predecessor, if it's a null pointer. 
+	if Predecessor.ChordID == nil {
+		Predecessor = nodePtr 
+	} else if Inclusive_in(nodePtr.ChordID, addOne(Predecessor.ChordID), subOne(FingerTable[SELF].ChordID)) {
+		Predecessor = nodePtr 
+	}
+}
+
+// Called periodically. Verifies immediate successor, and tells 
+// (potentially new) successor about ourself. 
+func Stabilize() {
+
+	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	var client *rpc.Client
+
+	client, err := jsonrpc.Dial("tcp", service)
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+	} 
+
+    var getPredecessorReply GetPredecessorReply
+    var args interface{}
+	err = client.Call("Node.GetPredecessor", &args, &getPredecessorReply) // Should I be closing this? todo 
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+	}
+	client.Close() 
+
+	successorsPredecessor := getPredecessorReply.Predecessor 
+
+	if successorsPredecessor.ChordID != nil {
+    	if Inclusive_in(successorsPredecessor.ChordID, addOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
+		    FingerTable[1] = successorsPredecessor
+	    }
+	}
+
+	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	client, err = jsonrpc.Dial("tcp", service)
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+	} 
+
+	var notifyArgs NotifyArgs
+	notifyArgs.ChordNodePtr = FingerTable[0]
+	var reply interface{}
+	err = client.Call("Node.Notify", &notifyArgs, &reply) // should I be closing this? todo 
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+	}
+	client.Close() 
 }

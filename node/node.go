@@ -17,6 +17,7 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"time"
 )
 
 // server configuration object read in
@@ -69,6 +70,14 @@ type ListIDsReply struct {
 }
 type FindSuccessorReply struct {
 	ChordNodePtr chord.ChordNodePtr
+}
+
+type NotifyArgs struct {
+	ChordNodePtr chord.ChordNodePtr
+}
+
+type GetPredecessorReply struct {
+	Predecessor chord.ChordNodePtr
 }
 
 // global variable
@@ -192,6 +201,20 @@ func (t *Node) FindSuccessor(args *ChordIDArgs, reply *FindSuccessorReply) error
 	return nil 
 }
 
+// "reply *interface{}" means that no reply is sent. 
+func (t *Node) Notify(args *NotifyArgs, reply *interface{}) error {
+	fmt.Println("Notify wrapper called.")
+	chord.Notify(args.ChordNodePtr)
+	return nil 
+}
+
+// Takes no arguments, but does send a reply. 
+func (t *Node) GetPredecessor(args *interface{}, reply *GetPredecessorReply) error {
+	fmt.Println("GetPredecessor() RPC called.")
+	reply.Predecessor = chord.Predecessor 
+	return nil
+}
+
 //--------------CHORD WRAPPER METHODS-----------------------------
 
 func main() {
@@ -238,12 +261,27 @@ func main() {
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
+	go periodicallyStabilize() 
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			continue
 		}
 		go jsonrpc.ServeConn(conn)
+
+	}
+}
+
+func periodicallyStabilize() {
+	duration, _ := time.ParseDuration("3s")
+	for {
+		time.Sleep(duration)
+		chord.Stabilize() 
+
+		fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
+		fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
+		fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
 }
 
