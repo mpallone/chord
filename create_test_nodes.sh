@@ -1,7 +1,7 @@
 #!/bin/bash
 
 START=1
-NUM_TEST_NODES_TO_CREATE=4
+NUM_TEST_NODES_TO_CREATE=7
 REAL_NODE_FILE=node/node.go
 TEST_NODE_DIR=test_node
 
