@@ -211,6 +211,14 @@ func FindSuccessor(id *big.Int) ChordNodePtr {
 
 	closestPrecedingFinger := closestPrecedingNode(id)
 
+
+	// If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
+	// at the top of this function didn't work, and also that our finger table isn't yet correct. So, 
+	// ask our successor to find the node for us in this case. 
+	if closestPrecedingFinger.ChordID == FingerTable[0].ChordID {
+		closestPrecedingFinger = FingerTable[1]
+	}
+
 	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
 	var client *rpc.Client
 
@@ -223,9 +231,8 @@ func FindSuccessor(id *big.Int) ChordNodePtr {
         os.Exit(1)
 	} 
 
-	if closestPrecedingFinger.ChordID == FingerTable[SELF].ChordID { 
-		return FingerTable[1]
-	}
+
+
 
     var findSuccessorReply FindSuccessorReply
     var args ChordIDArgs
