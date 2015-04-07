@@ -4,7 +4,7 @@ REPO_DIR=$GOPATH/src/github.com/robcs621/proj2
 TEST_NODE_DIR=test_node
 
 START=1
-NUM_TEST_NODES_TO_RUN=7
+NUM_TEST_NODES_TO_RUN=9
 
 echo "Starting all ${NUM_TEST_NODES_TO_RUN} test nodes..."
 

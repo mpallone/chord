@@ -223,6 +223,10 @@ func FindSuccessor(id *big.Int) ChordNodePtr {
         os.Exit(1)
 	} 
 
+	if closestPrecedingFinger.ChordID == FingerTable[SELF].ChordID { 
+		return FingerTable[1]
+	}
+
     var findSuccessorReply FindSuccessorReply
     var args ChordIDArgs
     args.Id = id 
@@ -278,6 +282,7 @@ func Stabilize() {
 	err = client.Call("Node.GetPredecessor", &args, &getPredecessorReply) // Should I be closing this? todo 
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+		return 
 	}
 	client.Close() 
 
@@ -293,6 +298,7 @@ func Stabilize() {
 	client, err = jsonrpc.Dial("tcp", service)
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+		return 
 	} 
 
 	var notifyArgs NotifyArgs
@@ -301,6 +307,7 @@ func Stabilize() {
 	err = client.Call("Node.Notify", &notifyArgs, &reply) // should I be closing this? todo 
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+		return 
 	}
 	client.Close() 
 }
@@ -320,9 +327,14 @@ func FixFingers() {
 		base := big.NewInt(2)
 		exponent := big.NewInt(int64(next-1))
 		lookupKey := new(big.Int).Add(FingerTable[SELF].ChordID, new(big.Int).Exp(base, exponent, nil))
+		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(mBits)), nil))
 
-		FingerTable[next] = FindSuccessor(lookupKey)
+		fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
+		successor := FindSuccessor(lookupKey)
+		fmt.Println("result:", successor)
 
-		fmt.Println("FixFingers():", FingerTable)
+		FingerTable[next] = successor 
+
+		fmt.Println("\nFixFingers():", FingerTable)
 	}
 }
