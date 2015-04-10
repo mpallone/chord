@@ -9,7 +9,6 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"time"
-	"log"
 )
 
 type ChordNodePtr struct {
