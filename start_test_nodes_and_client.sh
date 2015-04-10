@@ -16,7 +16,7 @@ do
 
     if [[ $TMUX == 1 ]]; then
         pushd ${REPO_DIR}/${TEST_NODE_DIR}${node_num} &>/dev/null
-        tmux new-window -n "${TEST_NODE_DIR}${node_num}" ./${test_node_run_script_file_name}
+        tmux new-window -n "${TEST_NODE_DIR}${node_num}" "./${test_node_run_script_file_name}"
         popd &>/dev/null
     else
 	    gnome-terminal --working-directory=${REPO_DIR}/${TEST_NODE_DIR}${node_num} -e ./${test_node_run_script_file_name} --window-with-profile=HOLD_OPEN --title="${TEST_NODE_DIR}${node_num}"
