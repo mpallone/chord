@@ -9,6 +9,7 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"time"
+	"log"
 )
 
 type ChordNodePtr struct {
@@ -312,11 +313,13 @@ func Stabilize() {
 	notifyArgs.ChordNodePtr = FingerTable[0]
 	var reply interface{}
 	err = client.Call("Node.Notify", &notifyArgs, &reply) // should I be closing this? todo 
+	defer client.Close() 
+
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
 		return 
 	}
-	client.Close() 
+	
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here 
