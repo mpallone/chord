@@ -295,7 +295,7 @@ func Stabilize() {
 	}
 
 	var notifyArgs NotifyArgs
-	notifyArgs.ChordNodePtr = FingerTable[0]
+	notifyArgs.ChordNodePtr = FingerTable[SELF]
 	var reply interface{}
 	err = client2.Call("Node.Notify", &notifyArgs, &reply)
 
@@ -303,7 +303,6 @@ func Stabilize() {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
 		return
 	}
-
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
