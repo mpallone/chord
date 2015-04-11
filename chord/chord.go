@@ -167,9 +167,6 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
-		// todo - not sure what to do if a node fails.
-		// Exiting is nice if the node fails, to avoid subtle bugs,
-		// but the system should be more resilient than that.
 		return err
 	}
 
@@ -187,11 +184,9 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	// todo - I think it's actually better to just copy the successors finger table,
 	//        but I don't feel like implementing that right now, and stabilize() and
 	//        fix_fingers() should result in correct finger tables eventually.
-	for i := mBits; i >= 1; i-- {
-		FingerTable[i].IpAddress = findSuccessorReply.ChordNodePtr.IpAddress
-		FingerTable[i].Port = findSuccessorReply.ChordNodePtr.Port
-		FingerTable[i].ChordID = findSuccessorReply.ChordNodePtr.ChordID
-	}
+	FingerTable[1].IpAddress = findSuccessorReply.ChordNodePtr.IpAddress
+	FingerTable[1].Port = findSuccessorReply.ChordNodePtr.Port
+	FingerTable[1].ChordID = findSuccessorReply.ChordNodePtr.ChordID
 
 	fmt.Println("Finger table at the end of Join():", FingerTable)
 
