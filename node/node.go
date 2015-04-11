@@ -180,9 +180,13 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
 	fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
 
-	reply.ChordNodePtr = chord.FindSuccessor(args.Id)
+	var err error
+	reply.ChordNodePtr, err = chord.FindSuccessor(args.Id)
+	if err != nil {
+		fmt.Println("FindSuccessor() RPC received an error when calling chord.FindSuccessor()")
+	}
 
-	return nil
+	return err
 }
 
 // "reply *interface{}" means that no reply is sent.

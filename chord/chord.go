@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-	"os"
 	"time"
 )
 
@@ -193,47 +192,47 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	return nil
 }
 
-func FindSuccessor(id *big.Int) ChordNodePtr {
+func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	fmt.Println("finding successor of: ", id)
 
 	if Inclusive_in(id, addOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
-		return FingerTable[1]
+		return FingerTable[1], nil
 	}
 
 	closestPrecedingFinger := closestPrecedingNode(id)
 
-	// If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
+	// TODO If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
 	// at the top of this function didn't work, and also that our finger table isn't yet correct. So,
 	// ask our successor to find the node for us in this case.
 	if closestPrecedingFinger.ChordID == FingerTable[0].ChordID {
-		closestPrecedingFinger = FingerTable[1]
+		fmt.Println("FINDSUCCESSOR!! THIS SHOULD NEVER HAPPEN!!! DELETE ME??")
+		//closestPrecedingFinger = FingerTable[1]
 	}
 
 	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
 	var client *rpc.Client
 
 	client, err := jsonrpc.Dial("tcp", service)
+	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
 		// todo - not sure what to do if a node fails.
 		// Exiting is nice if the node fails, to avoid subtle bugs,
 		// but the system should be more resilient than that.
-		os.Exit(1)
+		return ChordNodePtr{}, err
 	}
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
 	args.Id = id
-	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply) // Should I be closing this? todo
+	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
-		// todo - Again, probably shouldn't be exiting here.
-		os.Exit(1)
+		return ChordNodePtr{}, err
 	}
-	client.Close()
 
-	return findSuccessorReply.ChordNodePtr
+	return findSuccessorReply.ChordNodePtr, nil
 }
 
 func closestPrecedingNode(id *big.Int) ChordNodePtr {
@@ -329,7 +328,10 @@ func FixFingers() {
 		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(mBits)), nil))
 
 		fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
-		successor := FindSuccessor(lookupKey)
+		successor, err := FindSuccessor(lookupKey)
+		if err != nil {
+			return
+		}
 		fmt.Println("result:", successor)
 
 		FingerTable[next] = successor
