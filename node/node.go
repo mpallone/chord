@@ -90,6 +90,47 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
+	currentNodeID := chord.FingerTable[chord.SELF].ChordID
+    predecessor := chord.Predecessor.ChordID
+    keyID := chord.GetChordID(string(args.Key))
+    
+    //if [currentNodeID+1 <= keyID <= 255] || 0 <= keyID <= predecessor] is true 
+    //then do not insert at this node and call the insert on the node's successor
+    if chord.Inclusive_in(keyID, chord.AddOne(currentNodeID), predecessor) {
+    	
+    	//Get Successor
+		var nodeArgs chord.ChordIDArgs
+		nodeArgs.Id = chord.FingerTable[chord.SELF].ChordID
+		Successor_ChordNodePtr, err := chord.FindSuccessor(nodeArgs.Id)
+		if err != nil {
+			fmt.Println("ERROR: Insert() received an error when calling the Node.FindSuccessor RPC: ", err)
+			fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
+			return err
+		}
+    	
+    	// Dial the successor node
+		client, err := chord.DialNode(Successor_ChordNodePtr.IpAddress,Successor_ChordNodePtr.Port)
+		defer client.Close()
+		if err != nil {
+			fmt.Println("ERROR: Insert() could not connect to closest preceding node: ", err)
+			return err
+		}
+		
+		//Copy reply
+		newReply := reply
+		
+		//Call remote RPC Insert method 
+		err = client.Call("Node.Insert", &args, &newReply)
+		if err != nil {
+			fmt.Println("ERROR: Insert() could not Insert into remote node ", err)
+			return err
+		}
+		
+		//return the reply message
+		reply.TripletInserted = newReply.TripletInserted
+		
+    }else{//just inser it
+    
 	fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
 	// construct temp KeyRelPair
@@ -103,6 +144,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		writeDictToDisk()
 	} else {
 		fmt.Println(" ... Triplet already exists in DICT3.")
+	}
 	}
 	return nil
 }
