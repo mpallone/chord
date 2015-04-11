@@ -240,7 +240,7 @@ func main() {
 		// contact CreatedNode and pass in my own chord ID
 		// todo - this hard-coded stuff should really be in the config file
 		duration, _ := time.ParseDuration("3s")
-		for chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port) == nil {
+		for chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port) != nil {
 			time.Sleep(duration)
 		}
 	}
