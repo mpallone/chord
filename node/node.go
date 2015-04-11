@@ -12,7 +12,6 @@ import (
 	"github.com/robcs621/proj2/chord"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -183,20 +182,20 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 
 	reply.ChordNodePtr = chord.FindSuccessor(args.Id)
 
-	return nil 
+	return nil
 }
 
-// "reply *interface{}" means that no reply is sent. 
+// "reply *interface{}" means that no reply is sent.
 func (t *Node) Notify(args *chord.NotifyArgs, reply *interface{}) error {
 	fmt.Println("Notify wrapper called.")
 	chord.Notify(args.ChordNodePtr)
-	return nil 
+	return nil
 }
 
-// Takes no arguments, but does send a reply. 
+// Takes no arguments, but does send a reply.
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	fmt.Println("GetPredecessor() RPC called.")
-	reply.Predecessor = chord.Predecessor 
+	reply.Predecessor = chord.Predecessor
 	return nil
 }
 
@@ -239,15 +238,17 @@ func main() {
 		fmt.Println("Finger Table: ", chord.FingerTable)
 	} else {
 		// contact CreatedNode and pass in my own chord ID
-		//chord.Join("127.0.0.1", "7001", chord.GetChordID(conf.IpAddress+":"+conf.Port))
-		// todo - this hard-coded stuff should really be in the config file 
-		chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port)
+		// todo - this hard-coded stuff should really be in the config file
+		duration, _ := time.ParseDuration("3s")
+		for chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port) == nil {
+			time.Sleep(duration)
+		}
 	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
-	go periodicallyStabilize() 
-	go chord.FixFingers() 
+	go periodicallyStabilize()
+	go chord.FixFingers()
 
 	for {
 		conn, err := listener.Accept()
@@ -260,11 +261,11 @@ func main() {
 }
 
 func periodicallyStabilize() {
-	// todo - this, and other methods, should probably be using RWLock. 
+	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("3s")
 	for {
 		time.Sleep(duration)
-		chord.Stabilize() 
+		chord.Stabilize()
 
 		fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
 		fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
