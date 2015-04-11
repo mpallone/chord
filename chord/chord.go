@@ -18,7 +18,7 @@ type ChordNodePtr struct {
 }
 
 const mBits int = 8
-const SELF int = 0 
+const SELF int = 0
 
 var Predecessor ChordNodePtr
 
@@ -140,16 +140,16 @@ func Create(ip string, port string) {
 	// first entry in finger table is set to itself
 	// first node is its own successor since no other nodes yet in the ring
 
-	// FingerTable[1].IpAddress = ip
-	// FingerTable[1].Port = port
-	// FingerTable[1].ChordID = GetChordID(ip + ":" + port)
+	FingerTable[1].IpAddress = ip
+	FingerTable[1].Port = port
+	FingerTable[1].ChordID = GetChordID(ip + ":" + port)
 
 	// Include 0 - let the 0th element point to ourself. 
-	for i := mBits; i >= 0; i-- {
+	/*for i := mBits; i >= 0; i-- {
 		FingerTable[i].IpAddress = ip 
 		FingerTable[i].Port = port 
 		FingerTable[i].ChordID = GetChordID(ip + ":" + port)
-	}
+	}*/
 }
 
 // parameters ip and port passed in is the existing node's ip address and port
@@ -252,12 +252,14 @@ func closestPrecedingNode(id *big.Int) ChordNodePtr {
 
 	for i := mBits; i >= 1; i-- {
 
-		myId := FingerTable[1].ChordID 
-		currentFingerId := FingerTable[i].ChordID 
+        if FingerTable[i].ChordID != nil {
+            myId := FingerTable[SELF].ChordID
+            currentFingerId := FingerTable[i].ChordID
 
-		if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
-			return FingerTable[i]
-		}
+            if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
+                return FingerTable[i]
+            }
+        }
 	}
 	return FingerTable[SELF]
 }

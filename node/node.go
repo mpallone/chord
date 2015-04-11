@@ -50,10 +50,6 @@ type Args struct {
 	Val TripVal // only used for insert and insertOrUpdate,
 }
 
-type ChordIDArgs struct {
-	Id *big.Int
-}
-
 type LookupReply struct {
 	Key TripKey
 	Rel TripRel
@@ -67,17 +63,6 @@ type ListKeysReply struct {
 }
 type ListIDsReply struct {
 	IDList []KeyRelPair
-}
-type FindSuccessorReply struct {
-	ChordNodePtr chord.ChordNodePtr
-}
-
-type NotifyArgs struct {
-	ChordNodePtr chord.ChordNodePtr
-}
-
-type GetPredecessorReply struct {
-	Predecessor chord.ChordNodePtr
 }
 
 // global variable
@@ -193,7 +178,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 }
 
 //--------------CHORD WRAPPER METHODS-----------------------------
-func (t *Node) FindSuccessor(args *ChordIDArgs, reply *FindSuccessorReply) error {
+func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
 	fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
 
 	reply.ChordNodePtr = chord.FindSuccessor(args.Id)
@@ -202,14 +187,14 @@ func (t *Node) FindSuccessor(args *ChordIDArgs, reply *FindSuccessorReply) error
 }
 
 // "reply *interface{}" means that no reply is sent. 
-func (t *Node) Notify(args *NotifyArgs, reply *interface{}) error {
+func (t *Node) Notify(args *chord.NotifyArgs, reply *interface{}) error {
 	fmt.Println("Notify wrapper called.")
 	chord.Notify(args.ChordNodePtr)
 	return nil 
 }
 
 // Takes no arguments, but does send a reply. 
-func (t *Node) GetPredecessor(args *interface{}, reply *GetPredecessorReply) error {
+func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	fmt.Println("GetPredecessor() RPC called.")
 	reply.Predecessor = chord.Predecessor 
 	return nil
