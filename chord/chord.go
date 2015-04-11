@@ -90,7 +90,7 @@ func ComputeMaxKey() *big.Int {
 
 // Add one to n, and wrap around if need be.
 // This is mostly to avoid the ugly big.Int syntax.
-func addOne(n *big.Int) *big.Int {
+func AddOne(n *big.Int) *big.Int {
 	result := big.NewInt(0)
 	result = result.Add(n, big.NewInt(1))
 	max_val := ComputeMaxKey()
@@ -155,10 +155,8 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[SELF].Port = myPort
 	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
-	// make RPC call to existing node already in chord ring (use Client.Call)
-	service := existingNodeIP + ":" + existingNodePort
-	var client *rpc.Client
-	client, err := jsonrpc.Dial("tcp", service)
+	// Dial the node
+	client, err := DialNode(existingNodeIP,existingNodePort)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
@@ -192,7 +190,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	fmt.Println("finding successor of: ", id)
 
-	if Inclusive_in(id, addOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
+	if Inclusive_in(id, AddOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
 		return FingerTable[1], nil
 	}
 
@@ -206,10 +204,8 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 		//closestPrecedingFinger = FingerTable[1]
 	}
 
-	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
-	var client *rpc.Client
-
-	client, err := jsonrpc.Dial("tcp", service)
+	// Dial the node
+	client, err := DialNode(closestPrecedingFinger.IpAddress,closestPrecedingFinger.Port)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
@@ -236,7 +232,7 @@ func closestPrecedingNode(id *big.Int) ChordNodePtr {
 			myId := FingerTable[SELF].ChordID
 			currentFingerId := FingerTable[i].ChordID
 
-			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
+			if Inclusive_in(currentFingerId, AddOne(myId), subOne(id)) {
 				return FingerTable[i]
 			}
 		}
@@ -249,7 +245,7 @@ func Notify(nodePtr ChordNodePtr) {
 	// Need to be careful not to dereference Predecessor, if it's a null pointer.
 	if Predecessor.ChordID == nil {
 		Predecessor = nodePtr
-	} else if Inclusive_in(nodePtr.ChordID, addOne(Predecessor.ChordID), subOne(FingerTable[SELF].ChordID)) {
+	} else if Inclusive_in(nodePtr.ChordID, AddOne(Predecessor.ChordID), subOne(FingerTable[SELF].ChordID)) {
 		Predecessor = nodePtr
 	}
 }
@@ -284,7 +280,7 @@ func Stabilize() {
     	successorsPredecessor := getPredecessorReply.Predecessor
     
     	if successorsPredecessor.ChordID != nil {
-    		if Inclusive_in(successorsPredecessor.ChordID, addOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
+    		if Inclusive_in(successorsPredecessor.ChordID, AddOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
     			FingerTable[1] = successorsPredecessor
     		}
     	}
@@ -340,4 +336,17 @@ func FixFingers() {
 
 		fmt.Println("\nFixFingers():", FingerTable)
 	}
+}
+
+// Dial a node and create a new client
+func DialNode(NodeIP string, NodePort string) (*rpc.Client, error){
+	
+	service := NodeIP + ":" + NodePort          //create service
+	client := new(rpc.Client)                   //get a pointer to an instance of "rpc.Client"
+	client, err := jsonrpc.Dial("tcp", service) //dial the node
+	
+	if err != nil {
+		return client, err
+	}
+	return client, nil
 }
