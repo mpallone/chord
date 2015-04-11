@@ -217,9 +217,6 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
-		// todo - not sure what to do if a node fails.
-		// Exiting is nice if the node fails, to avoid subtle bugs,
-		// but the system should be more resilient than that.
 		return ChordNodePtr{}, err
 	}
 
@@ -266,21 +263,20 @@ func Notify(nodePtr ChordNodePtr) {
 func Stabilize() {
 
 	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-	var client *rpc.Client
 
-	client, err := jsonrpc.Dial("tcp", service)
+	client1, err := jsonrpc.Dial("tcp", service)
+	defer client1.Close()
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
 	}
 
 	var getPredecessorReply GetPredecessorReply
 	var args interface{}
-	err = client.Call("Node.GetPredecessor", &args, &getPredecessorReply) // Should I be closing this? todo
+	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
 		return
 	}
-	client.Close()
 
 	successorsPredecessor := getPredecessorReply.Predecessor
 
@@ -291,7 +287,8 @@ func Stabilize() {
 	}
 
 	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-	client, err = jsonrpc.Dial("tcp", service)
+	client2, err := jsonrpc.Dial("tcp", service)
+	defer client2.Close()
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
 		return
@@ -300,8 +297,7 @@ func Stabilize() {
 	var notifyArgs NotifyArgs
 	notifyArgs.ChordNodePtr = FingerTable[0]
 	var reply interface{}
-	err = client.Call("Node.Notify", &notifyArgs, &reply) // should I be closing this? todo
-	defer client.Close()
+	err = client2.Call("Node.Notify", &notifyArgs, &reply)
 
 	if err != nil {
 		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
