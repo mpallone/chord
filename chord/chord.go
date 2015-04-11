@@ -23,22 +23,18 @@ var Predecessor ChordNodePtr
 
 var FingerTable [mBits + 1]ChordNodePtr
 
-// todo - this is a duplicate definition as what's in node.go!
 type FindSuccessorReply struct {
 	ChordNodePtr ChordNodePtr
 }
 
-// todo - this is a duplicate definition as what's in node.go!
 type ChordIDArgs struct {
 	Id *big.Int
 }
 
-// todo - this is a duplicate definition as what's in node.go!
 type NotifyArgs struct {
 	ChordNodePtr ChordNodePtr
 }
 
-// todo - this is a duplicate definition as what's in node.go!
 type GetPredecessorReply struct {
 	Predecessor ChordNodePtr
 }
@@ -262,50 +258,61 @@ func Notify(nodePtr ChordNodePtr) {
 // (potentially new) successor about ourself.
 func Stabilize() {
 
-	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	// todo - this, and other methods, should probably be using RWLock.
+	duration, _ := time.ParseDuration("3s")
+	for {
+		time.Sleep(duration)
 
-	client1, err := jsonrpc.Dial("tcp", service)
-	defer client1.Close()
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-	}
+		fmt.Println("top of Stabilize() loop")
 
-	var getPredecessorReply GetPredecessorReply
-	var args interface{}
-	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
-		return
-	}
+    	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+    
+    	client1, err := jsonrpc.Dial("tcp", service)
+    	defer client1.Close()
+    	if err != nil {
+    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+    	}
+    
+    	var getPredecessorReply GetPredecessorReply
+    	var args interface{}
+    	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
+    	if err != nil {
+    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+    		return
+    	}
+    
+    	successorsPredecessor := getPredecessorReply.Predecessor
+    
+    	if successorsPredecessor.ChordID != nil {
+    		if Inclusive_in(successorsPredecessor.ChordID, addOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
+    			FingerTable[1] = successorsPredecessor
+    		}
+    	}
+    
+    	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+    	client2, err := jsonrpc.Dial("tcp", service)
+    	defer client2.Close()
+    	if err != nil {
+    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+    		return
+    	}
+    
+    	var notifyArgs NotifyArgs
+    	notifyArgs.ChordNodePtr = FingerTable[SELF]
+    	var reply interface{}
+    	err = client2.Call("Node.Notify", &notifyArgs, &reply)
+    
+    	if err != nil {
+    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+    		// return
+    	}
 
-	successorsPredecessor := getPredecessorReply.Predecessor
-
-	if successorsPredecessor.ChordID != nil {
-		if Inclusive_in(successorsPredecessor.ChordID, addOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
-			FingerTable[1] = successorsPredecessor
-		}
-	}
-
-	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-	client2, err := jsonrpc.Dial("tcp", service)
-	defer client2.Close()
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-		return
-	}
-
-	var notifyArgs NotifyArgs
-	notifyArgs.ChordNodePtr = FingerTable[SELF]
-	var reply interface{}
-	err = client2.Call("Node.Notify", &notifyArgs, &reply)
-
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
-		return
+		fmt.Println("Stabilize(), predecess:", Predecessor)
+		fmt.Println("Stabilize(), myself   :", FingerTable[0])
+		fmt.Println("Stabilize(), successor:", FingerTable[1])
 	}
 }
 
-// todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
 func FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("2s")

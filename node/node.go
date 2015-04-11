@@ -251,7 +251,8 @@ func main() {
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
-	go periodicallyStabilize()
+	// go periodicallyStabilize()
+	go chord.Stabilize() 
 	go chord.FixFingers()
 
 	for {
@@ -261,19 +262,6 @@ func main() {
 		}
 		go jsonrpc.ServeConn(conn)
 
-	}
-}
-
-func periodicallyStabilize() {
-	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("3s")
-	for {
-		time.Sleep(duration)
-		chord.Stabilize()
-
-		fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
-		fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
-		fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
 }
 
