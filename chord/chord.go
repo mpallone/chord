@@ -23,18 +23,22 @@ var Predecessor ChordNodePtr
 
 var FingerTable [mBits + 1]ChordNodePtr
 
+// todo - this is a duplicate definition as what's in node.go!
 type FindSuccessorReply struct {
 	ChordNodePtr ChordNodePtr
 }
 
+// todo - this is a duplicate definition as what's in node.go!
 type ChordIDArgs struct {
 	Id *big.Int
 }
 
+// todo - this is a duplicate definition as what's in node.go!
 type NotifyArgs struct {
 	ChordNodePtr ChordNodePtr
 }
 
+// todo - this is a duplicate definition as what's in node.go!
 type GetPredecessorReply struct {
 	Predecessor ChordNodePtr
 }
@@ -90,7 +94,7 @@ func ComputeMaxKey() *big.Int {
 
 // Add one to n, and wrap around if need be.
 // This is mostly to avoid the ugly big.Int syntax.
-func AddOne(n *big.Int) *big.Int {
+func addOne(n *big.Int) *big.Int {
 	result := big.NewInt(0)
 	result = result.Add(n, big.NewInt(1))
 	max_val := ComputeMaxKey()
@@ -155,8 +159,10 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[SELF].Port = myPort
 	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
-	// Dial the node
-	client, err := DialNode(existingNodeIP,existingNodePort)
+	// make RPC call to existing node already in chord ring (use Client.Call)
+	service := existingNodeIP + ":" + existingNodePort
+	var client *rpc.Client
+	client, err := jsonrpc.Dial("tcp", service)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
@@ -190,7 +196,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	fmt.Println("finding successor of: ", id)
 
-	if Inclusive_in(id, AddOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
+	if Inclusive_in(id, addOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
 		return FingerTable[1], nil
 	}
 
@@ -204,8 +210,10 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 		//closestPrecedingFinger = FingerTable[1]
 	}
 
-	// Dial the node
-	client, err := DialNode(closestPrecedingFinger.IpAddress,closestPrecedingFinger.Port)
+	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
+	var client *rpc.Client
+
+	client, err := jsonrpc.Dial("tcp", service)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
@@ -232,7 +240,7 @@ func closestPrecedingNode(id *big.Int) ChordNodePtr {
 			myId := FingerTable[SELF].ChordID
 			currentFingerId := FingerTable[i].ChordID
 
-			if Inclusive_in(currentFingerId, AddOne(myId), subOne(id)) {
+			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
 				return FingerTable[i]
 			}
 		}
@@ -245,7 +253,7 @@ func Notify(nodePtr ChordNodePtr) {
 	// Need to be careful not to dereference Predecessor, if it's a null pointer.
 	if Predecessor.ChordID == nil {
 		Predecessor = nodePtr
-	} else if Inclusive_in(nodePtr.ChordID, AddOne(Predecessor.ChordID), subOne(FingerTable[SELF].ChordID)) {
+	} else if Inclusive_in(nodePtr.ChordID, addOne(Predecessor.ChordID), subOne(FingerTable[SELF].ChordID)) {
 		Predecessor = nodePtr
 	}
 }
@@ -254,61 +262,50 @@ func Notify(nodePtr ChordNodePtr) {
 // (potentially new) successor about ourself.
 func Stabilize() {
 
-	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("3s")
-	for {
-		time.Sleep(duration)
+	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
 
-		fmt.Println("top of Stabilize() loop")
+	client1, err := jsonrpc.Dial("tcp", service)
+	defer client1.Close()
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+	}
 
-    	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-    
-    	client1, err := jsonrpc.Dial("tcp", service)
-    	defer client1.Close()
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-    	}
-    
-    	var getPredecessorReply GetPredecessorReply
-    	var args interface{}
-    	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
-    		return
-    	}
-    
-    	successorsPredecessor := getPredecessorReply.Predecessor
-    
-    	if successorsPredecessor.ChordID != nil {
-    		if Inclusive_in(successorsPredecessor.ChordID, AddOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
-    			FingerTable[1] = successorsPredecessor
-    		}
-    	}
-    
-    	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-    	client2, err := jsonrpc.Dial("tcp", service)
-    	defer client2.Close()
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-    		return
-    	}
-    
-    	var notifyArgs NotifyArgs
-    	notifyArgs.ChordNodePtr = FingerTable[SELF]
-    	var reply interface{}
-    	err = client2.Call("Node.Notify", &notifyArgs, &reply)
-    
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
-    		// return
-    	}
+	var getPredecessorReply GetPredecessorReply
+	var args interface{}
+	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+		return
+	}
 
-		fmt.Println("Stabilize(), predecess:", Predecessor)
-		fmt.Println("Stabilize(), myself   :", FingerTable[0])
-		fmt.Println("Stabilize(), successor:", FingerTable[1])
+	successorsPredecessor := getPredecessorReply.Predecessor
+
+	if successorsPredecessor.ChordID != nil {
+		if Inclusive_in(successorsPredecessor.ChordID, addOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
+			FingerTable[1] = successorsPredecessor
+		}
+	}
+
+	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	client2, err := jsonrpc.Dial("tcp", service)
+	defer client2.Close()
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+		return
+	}
+
+	var notifyArgs NotifyArgs
+	notifyArgs.ChordNodePtr = FingerTable[SELF]
+	var reply interface{}
+	err = client2.Call("Node.Notify", &notifyArgs, &reply)
+
+	if err != nil {
+		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+		return
 	}
 }
 
+// todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
 func FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("2s")
@@ -338,15 +335,3 @@ func FixFingers() {
 	}
 }
 
-// Dial a node and create a new client
-func DialNode(NodeIP string, NodePort string) (*rpc.Client, error){
-	
-	service := NodeIP + ":" + NodePort          //create service
-	client := new(rpc.Client)                   //get a pointer to an instance of "rpc.Client"
-	client, err := jsonrpc.Dial("tcp", service) //dial the node
-	
-	if err != nil {
-		return client, err
-	}
-	return client, nil
-}
