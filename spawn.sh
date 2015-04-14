@@ -29,14 +29,14 @@ for c in $configs; do
         tmux)
             tmux new-window -n $c "node $c; cat -"
             ;;
-        gnome)
-	        gnome-terminal -e "node $c" -window-with-profile=HOLD_OPEN --title="$c"
+        gnome-terminal)
+	        gnome-terminal  -e "${GOPATH}/bin/node $c" --window-with-profile=HOLD_OPEN --title="$c"
             ;;
     esac
 done
 
 # pause for a few seconds until all servers are up and listening
-sleep 4
+sleep 3
 
 echo "Starting client"
 case $out_mode in
@@ -47,7 +47,7 @@ case $out_mode in
         tmux new-window -n "CLIENT" "client client.cfg; cat -"
         tmux -2 attach-session -d
         ;;
-    gnome)
-	    gnome-terminal -e "client client.cfg" -window-with-profile=HOLD_OPEN --title="CLIENT"
+    gnome-terminal)
+	    gnome-terminal -e "${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
         ;;
 esac
