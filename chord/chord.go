@@ -156,7 +156,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
 	// Dial the node
-	client, err := DialNode(existingNodeIP,existingNodePort)
+	client, err := DialNode(existingNodeIP, existingNodePort)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
@@ -205,7 +205,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 	}
 
 	// Dial the node
-	client, err := DialNode(closestPrecedingFinger.IpAddress,closestPrecedingFinger.Port)
+	client, err := DialNode(closestPrecedingFinger.IpAddress, closestPrecedingFinger.Port)
 	defer client.Close()
 	if err != nil {
 		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
@@ -261,47 +261,47 @@ func Stabilize() {
 
 		fmt.Println("top of Stabilize() loop")
 
-    	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-    
-    	client1, err := jsonrpc.Dial("tcp", service)
-    	defer client1.Close()
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-    	}
-    
-    	var getPredecessorReply GetPredecessorReply
-    	var args interface{}
-    	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
-    		return
-    	}
-    
-    	successorsPredecessor := getPredecessorReply.Predecessor
-    
-    	if successorsPredecessor.ChordID != nil {
-    		if Inclusive_in(successorsPredecessor.ChordID, AddOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
-    			FingerTable[1] = successorsPredecessor
-    		}
-    	}
-    
-    	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-    	client2, err := jsonrpc.Dial("tcp", service)
-    	defer client2.Close()
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-    		return
-    	}
-    
-    	var notifyArgs NotifyArgs
-    	notifyArgs.ChordNodePtr = FingerTable[SELF]
-    	var reply interface{}
-    	err = client2.Call("Node.Notify", &notifyArgs, &reply)
-    
-    	if err != nil {
-    		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
-    		// return
-    	}
+		service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+
+		client1, err := jsonrpc.Dial("tcp", service)
+		defer client1.Close()
+		if err != nil {
+			fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+		}
+
+		var getPredecessorReply GetPredecessorReply
+		var args interface{}
+		err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
+		if err != nil {
+			fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+			return
+		}
+
+		successorsPredecessor := getPredecessorReply.Predecessor
+
+		if successorsPredecessor.ChordID != nil {
+			if Inclusive_in(successorsPredecessor.ChordID, AddOne(FingerTable[SELF].ChordID), subOne(FingerTable[1].ChordID)) {
+				FingerTable[1] = successorsPredecessor
+			}
+		}
+
+		service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+		client2, err := jsonrpc.Dial("tcp", service)
+		defer client2.Close()
+		if err != nil {
+			fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+			return
+		}
+
+		var notifyArgs NotifyArgs
+		notifyArgs.ChordNodePtr = FingerTable[SELF]
+		var reply interface{}
+		err = client2.Call("Node.Notify", &notifyArgs, &reply)
+
+		if err != nil {
+			fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+			// return
+		}
 
 		fmt.Println("Stabilize(), predecess:", Predecessor)
 		fmt.Println("Stabilize(), myself   :", FingerTable[0])
@@ -339,12 +339,12 @@ func FixFingers() {
 }
 
 // Dial a node and create a new client
-func DialNode(NodeIP string, NodePort string) (*rpc.Client, error){
-	
+func DialNode(NodeIP string, NodePort string) (*rpc.Client, error) {
+
 	service := NodeIP + ":" + NodePort          //create service
 	client := new(rpc.Client)                   //get a pointer to an instance of "rpc.Client"
 	client, err := jsonrpc.Dial("tcp", service) //dial the node
-	
+
 	if err != nil {
 		return client, err
 	}

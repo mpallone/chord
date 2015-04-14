@@ -15,25 +15,28 @@ Create the following directory structure:
 $HOME/go/src/github.com/robcs621/
 
 # Example on my computer, your home directory will differ from mine (rrr) obviously:
+# These assume your $PATH variable contains $GOPATH/bin
 
 # from the robcs621 directory:
-/home/rrr/go/src/github.com/robcs621 ~] git clone https://github.com/robcs621/proj2.git
-/home/rrr/go/src/github.com/robcs621 ~] cd proj2
+git clone https://github.com/robcs621/proj2.git
+cd proj2
 
 # make sure scripts are executable 
-/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x create_test_nodes.sh
-/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x start_test_nodes_and_client.sh
-/home/rrr/go/src/github.com/robcs621/proj2 ~]chmod u+x client/run_client.sh
+chmod u+x *.sh
 
-# after running the following script, you should have 4 test_node directories 
-/home/rrr/go/src/github.com/robcs621/proj2 ~]./create_test_nodes.sh
+# build the binaries, which should be available under $GOPATH/bin and $GOPATH/lib
+./build.sh
 
-# now start 4 test_nodes and the client (the number of nodes can be changed easily at the top of both scripts)
-/home/rrr/go/src/github.com/robcs621/proj2 ~]./start_test_nodes_and_client.sh
+# configure the node instances by providing a conf directory and number of instances
+# instances will be numbered starting at 7001, where instances number represents port number
+/config_gen.sh <config_dir> <store_dir> <num_instances>
+
+# To spawn instances, use the following script. When run without instance#, all avaialable configs will loaded.
+# out_mode must either be "gnome-terminal", "tmux", or "null"
+./spawn.sh <out_mode> <config_dir> [instancenum.config instancenum.config...]
 
 # to run all of the sample test messages at once, close out only the CLIENT terminal window and then do the following:
-# (the client will connect to test_node1, based on the port currently in the client.config, which can be changed)
-/home/rrr/go/src/github.com/robcs621/proj2 ~] cd client/
-/home/rrr/go/src/github.com/robcs621/proj2/client ~] go run client.go client.config < sample_input/client_test_messages.txt 
+# (the client will connect to test_node 7001, based on the port currently in the client.config, which can be changed)
+client client/client.config < sample_input/client_test_messages.txt 
 
 
