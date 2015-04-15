@@ -1,6 +1,7 @@
 #!/bin/bash
 PROJPATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 BIND=127.0.0.1
+BASE_PORT=7000
 
 if [[ $# != 3 ]]; then
     echo Usage: $0 "<config_dir> <store_dir> <num_instances>"
@@ -15,14 +16,15 @@ rm -r $config_dir
 mkdir -p $config_dir $stor_dir 2>/dev/null
 pushd $store_dir; store_dir=`pwd`; popd
 for ((i=1; i<=$num_instances; i++)); do
-    echo Configuring $BIND:700$i
+    let PORT=$BASE_PORT+$i
+    echo Configuring $BIND:$PORT
 	echo '{
-	"serverID"  : "'${BIND}:700$i'",
+	"serverID"  : "'${BIND}:$PORT'",
 	"protocol"  : "tcp",
 	"ipAddress" : "'$BIND'",
-	"port"	    : "700'$i'",
+	"port"	    : "'$PORT'",
 	"persistentStorageContainer" : {"file" : "'$store_dir/dict3_${i}.gob'"},
 	"methods"   : ["lookup", "insert", "insertOrUpdate", "delete", "listKeys", "listIDs", "shutdown"] 
-}'  > $config_dir/700${i}.config
+}'  > $config_dir/${i}.config
 done
 cp $PROJPATH/client/client.config $config_dir/client.cfg
