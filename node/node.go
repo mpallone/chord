@@ -90,59 +90,16 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
-	currentNodeID := chord.FingerTable[chord.SELF].ChordID
-	predecessor := chord.Predecessor.ChordID
-	keyID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
-	//if [currentNodeID+1 <= keyID <= 255] || 0 <= keyID <= predecessor] is true
-	//then do not insert at this node and call the insert on the node's successor
-	if chord.Inclusive_in(keyID, chord.AddOne(currentNodeID), predecessor) {
-
-		//Get Successor of the keyID+Rel hash value
-		Successor_ChordNodePtr, err := chord.FindSuccessor(keyID)
-		if err != nil {
-			fmt.Println("ERROR: Insert() received an error when calling the Node.FindSuccessor RPC: ", err)
-			fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
-			return err
-		}
-
-		// Dial the successor node
-		client, err := chord.DialNode(Successor_ChordNodePtr.IpAddress, Successor_ChordNodePtr.Port)
-		defer client.Close()
-		if err != nil {
-			fmt.Println("ERROR: Insert() could not connect to closest preceding node: ", err)
-			return err
-		}
-
-		//Copy reply
-		newReply := reply
-
-		//Call remote RPC Insert method
-		err = client.Call("Node.Insert", &args, &newReply)
-		if err != nil {
-			fmt.Println("ERROR: Insert() could not Insert into remote node ", err)
-			return err
-		}
-
-		//return the reply message
-		reply.TripletInserted = newReply.TripletInserted
-
-	} else { //just inser it
-
-		fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
-
-		// construct temp KeyRelPair
-		krp := KeyRelPair{args.Key, args.Rel}
-
-		// add key-rel pair if does not exist in dict
-		if _, exists := dict[krp]; !exists {
-			dict[krp] = args.Val
-			reply.TripletInserted = true // default is false
-			fmt.Println(" ... Does not exist in DICT3. Writing new triplet to disk.")
-			writeDictToDisk()
-		} else {
-			fmt.Println(" ... Triplet already exists in DICT3.")
-		}
+	// add key-rel pair if does not exist in dict
+	if _, exists := dict[krp]; !exists {
+		dict[krp] = args.Val
+		reply.TripletInserted = true // default is false
+		fmt.Println(" ... Does not exist in DICT3. Writing new triplet to disk.")
+		writeDictToDisk()
+	} else {
+		fmt.Println(" ... Triplet already exists in DICT3.")
 	}
 	return nil
 }
@@ -291,8 +248,7 @@ func main() {
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")
 
-	// go periodicallyStabilize()
-	go chord.Stabilize()
+	go periodicallyStabilize()
 	go chord.FixFingers()
 
 	for {
@@ -302,6 +258,19 @@ func main() {
 		}
 		go jsonrpc.ServeConn(conn)
 
+	}
+}
+
+func periodicallyStabilize() {
+	// todo - this, and other methods, should probably be using RWLock.
+	duration, _ := time.ParseDuration("3s")
+	for {
+		time.Sleep(duration)
+		chord.Stabilize()
+
+		fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
+		fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
+		fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
 }
 
@@ -356,3 +325,4 @@ func checkErrorCondition(err error) {
 		log.Fatal(err)
 	}
 }
+

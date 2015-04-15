@@ -94,3 +94,4 @@ func checkErrorCondition(err error) {
 		log.Fatal(err)
 	}
 }
+
