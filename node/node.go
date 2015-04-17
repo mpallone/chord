@@ -92,6 +92,9 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
 	fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
+	// construct temp KeyRelPair
+	krp := KeyRelPair{args.Key, args.Rel}
+
 	// add key-rel pair if does not exist in dict
 	if _, exists := dict[krp]; !exists {
 		dict[krp] = args.Val
@@ -325,4 +328,3 @@ func checkErrorCondition(err error) {
 		log.Fatal(err)
 	}
 }
-

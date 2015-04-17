@@ -334,4 +334,3 @@ func FixFingers() {
 		fmt.Println("\nFixFingers():", FingerTable)
 	}
 }
-
