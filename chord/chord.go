@@ -3,6 +3,7 @@ package chord
 
 import (
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/rpc"
@@ -160,23 +161,34 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
 
 	// make RPC call to existing node already in chord ring (use Client.Call)
-	service := existingNodeIP + ":" + existingNodePort
-	var client *rpc.Client
-	client, err := jsonrpc.Dial("tcp", service)
-	defer client.Close()
-	if err != nil {
-		fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
-		return err
-	}
+	// service := existingNodeIP + ":" + existingNodePort
+	// var client *rpc.Client
+	// client, err := jsonrpc.Dial("tcp", service)
+	// defer client.Close()
+	// if err != nil {
+	// 	fmt.Println("ERROR: Join() could not connect to: ", existingNodeIP, ":", existingNodePort, "; error:", err)
+	// 	return err
+	// }
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
 	args.Id = FingerTable[SELF].ChordID
-	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+
+	var chordNodePtrToExistingNode ChordNodePtr
+	chordNodePtrToExistingNode.IpAddress = existingNodeIP
+	chordNodePtrToExistingNode.Port = existingNodePort
+	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
+
+	// err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	// if err != nil {
+	// 	fmt.Println("ERROR: Join() received an error when calling the Node.FindSuccessor RPC: ", err)
+	// 	fmt.Println("address: ", existingNodeIP, ":", existingNodePort)
+	// 	return err
+	// }
+
+	err := callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode)
 	if err != nil {
-		fmt.Println("ERROR: Join() received an error when calling the Node.FindSuccessor RPC: ", err)
-		fmt.Println("address: ", existingNodeIP, ":", existingNodePort)
-		return err
+		fmt.Println("callRPC() returned the following error:", err)
 	}
 
 	// Set our fingers to point to the successor.
@@ -192,9 +204,62 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	return nil
 }
 
+// This is a generic way to call an RPC that hides the details of maintaining
+// the persistent connections (or dealing with old connections to failed nodes.)
+//
+// Similar to calling an RPC, this function returns an error, and populates the
+// reply pointer with whatever the RPC returns.
+//
+// rpcString: something like "node.FindSuccessor"
+// args: the argument struct pointer, just as would be passed to the RPC
+// reply: the reply struct pointer, just as would be passed to the RPC. This
+//        function will populate this value with whatever the RPC returns.
+// chordNodePtr: the node to contact
+//
+func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
+
+	fmt.Println("-------------------------------------------------------")
+	fmt.Println("callRPC() has been called with the following arguments:")
+	fmt.Println("rpcString:", rpcString)
+	fmt.Println("args:", args)
+	fmt.Println("reply:", reply)
+	fmt.Println("chordNodePtr:", chordNodePtr)
+
+	// Just to test that my function signature syntax is correct:
+	service := chordNodePtr.IpAddress + ":" + chordNodePtr.Port
+	var client *rpc.Client
+
+	client, err := jsonrpc.Dial("tcp", service)
+	defer client.Close()
+	if err != nil {
+		fmt.Println("callRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
+		// fmt.Println("ERROR: callRPC() could not connect to chordNodePtr: ", err)
+		return err
+	}
+
+	// var findSuccessorReply FindSuccessorReply
+	// var args ChordIDArgs
+	// args.Id = id
+	// err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	err = client.Call(rpcString, &args, &reply)
+	if err != nil {
+		// fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("callRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
+		return err
+	}
+
+	return nil
+}
+
 func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	fmt.Println("finding successor of: ", id)
+
+	if id == nil {
+		fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
+		delay("10s")                                                    // todo remove
+		return ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
+	}
 
 	if Inclusive_in(id, addOne(FingerTable[SELF].ChordID), FingerTable[1].ChordID) {
 		return FingerTable[1], nil
@@ -210,23 +275,30 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 		//closestPrecedingFinger = FingerTable[1]
 	}
 
-	service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
-	var client *rpc.Client
+	fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
 
-	client, err := jsonrpc.Dial("tcp", service)
-	defer client.Close()
-	if err != nil {
-		fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
-		return ChordNodePtr{}, err
-	}
+	// service := closestPrecedingFinger.IpAddress + ":" + closestPrecedingFinger.Port
+	// var client *rpc.Client
+
+	// client, err := jsonrpc.Dial("tcp", service)
+	// defer client.Close()
+	// if err != nil {
+	// 	fmt.Println("ERROR: FindSuccessor() could not connect to closest preceding node: ", err)
+	// 	return ChordNodePtr{}, err
+	// }
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
 	args.Id = id
-	err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	// err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
+	// if err != nil {
+	// 	fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
+	// 	return ChordNodePtr{}, err
+	// }
+
+	err := callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &closestPrecedingFinger)
 	if err != nil {
-		fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
-		return ChordNodePtr{}, err
+		fmt.Println("callRPC() returned the following error:", err)
 	}
 
 	return findSuccessorReply.ChordNodePtr, nil
@@ -333,4 +405,10 @@ func FixFingers() {
 
 		fmt.Println("\nFixFingers():", FingerTable)
 	}
+}
+
+// Mostly to slow things down for debugging.
+func delay(delayString string) {
+	duration, _ := time.ParseDuration(delayString)
+	time.Sleep(duration)
 }
