@@ -194,9 +194,14 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	// 	return err
 	// }
 
-	err := callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode)
-	if err != nil {
-		fmt.Println("callRPC() returned the following error:", err)
+	// err := callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode)
+	// if err != nil {
+	// 	fmt.Println("callRPC() returned the following error:", err)
+	// }
+
+	for callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
+		fmt.Println("FindSuccessor() call in Join failed, trying again after a short delay...")
+		delay("3s")
 	}
 
 	// Set our fingers to point to the successor.
