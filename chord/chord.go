@@ -24,6 +24,8 @@ var Predecessor ChordNodePtr
 
 var FingerTable [mBits + 1]ChordNodePtr
 
+var connections = make(map[string]*rpc.Client)
+
 // todo - this is a duplicate definition as what's in node.go!
 type FindSuccessorReply struct {
 	ChordNodePtr ChordNodePtr
@@ -42,6 +44,12 @@ type NotifyArgs struct {
 // todo - this is a duplicate definition as what's in node.go!
 type GetPredecessorReply struct {
 	Predecessor ChordNodePtr
+}
+
+// Notify doesn't send a reply, but I think the Go library
+// chokes if an RPC has a nil reply (hence those invalid errors)
+type NotifyReply struct {
+	Dummy string
 }
 
 // Implements the set membership test used by
@@ -225,30 +233,124 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 	fmt.Println("reply:", reply)
 	fmt.Println("chordNodePtr:", chordNodePtr)
 
+	fmt.Println("connections:", connections)
+
 	// Just to test that my function signature syntax is correct:
 	service := chordNodePtr.IpAddress + ":" + chordNodePtr.Port
 	var client *rpc.Client
+	var err error
+	callFailed := false
 
-	client, err := jsonrpc.Dial("tcp", service)
-	defer client.Close()
-	if err != nil {
-		fmt.Println("callRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
-		// fmt.Println("ERROR: callRPC() could not connect to chordNodePtr: ", err)
-		return err
+	client = connections[service]
+	fmt.Println("connections[service] returned this for the client:", client) // todo remove
+	if client != nil {
+		fmt.Println("client isn't nil, attempting to Call it")
+		err = client.Call(rpcString, args, reply)
+		if err != nil {
+			// fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
+			// fmt.Println("callRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
+			fmt.Println("callRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
+			fmt.Println("error received was:", err)
+			callFailed = true
+		}
+	}
+
+	if client == nil || callFailed {
+
+		fmt.Println("client is nil or the original call failed, attempting to establish a new connection")
+
+		client, err = jsonrpc.Dial("tcp", service)
+		// defer client.Close()
+		if err != nil {
+			fmt.Println("callRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
+			// fmt.Println("ERROR: callRPC() could not connect to chordNodePtr: ", err)
+			return err
+		}
+
+		fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>> client:", client)
+
+		// Only maintain a persistent connection if the node we're contacting is
+		// in our finger table, or if it's our predecessor.
+		//
+		// todo - if we implement 'r' predecessors and successors, this code might need
+		//        to be updated to maintain persistent connections to them, too.
+		// if isFingerOrPredecessor(chordNodePtr) || aFingerOrPredecessorIsNil() {
+		// 	connections[service] = client
+		// } else {
+		// 	defer client.Close()
+		// }
+
+		connections[service] = client
 	}
 
 	// var findSuccessorReply FindSuccessorReply
 	// var args ChordIDArgs
 	// args.Id = id
 	// err = client.Call("Node.FindSuccessor", &args, &findSuccessorReply)
-	err = client.Call(rpcString, &args, &reply)
+	fmt.Println("Bottom of callRPC(), client is:", client)
+	err = client.Call(rpcString, args, reply)
+	// client.Go(rpcString, args, reply, nil)
 	if err != nil {
 		// fmt.Println("ERROR: FindSuccessor() received an error when calling the Node.FindSuccessor RPC: ", err)
 		fmt.Println("callRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
 		return err
 	}
 
+	fmt.Println("callRPC() has populated the reply with:", reply)
+	fmt.Println("------------------------------------------------------")
+
 	return nil
+}
+
+// Helper method for callRPC(), so we can easily tell if a given
+// ChordNodePtr is one we should maintain a persistent connection
+// with.
+func isFingerOrPredecessor(chordNodePtr *ChordNodePtr) bool {
+	if ChordNodePtrsAreEqual(&Predecessor, chordNodePtr) {
+		return true
+	}
+
+	for i := mBits; i >= 1; i-- {
+
+		if FingerTable[i].ChordID != nil {
+			if ChordNodePtrsAreEqual(&FingerTable[i], chordNodePtr) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Returns True if a finger or predecessor is nil. The callRPC()
+// function uses this to hold off on closing a connection.
+// FixFingers() will be responsible for cleaning out the connections
+// variable.
+func aFingerOrPredecessorIsNil() bool {
+	if &Predecessor == nil {
+		return true
+	}
+
+	for i := mBits; i >= 1; i-- {
+
+		if FingerTable[i].ChordID != nil {
+			if &FingerTable[i] == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Returns True if two *ChordNodePtr's are the same. This could probably
+// just use the Chord ID, but screw big.Int
+func ChordNodePtrsAreEqual(ptr1 *ChordNodePtr, ptr2 *ChordNodePtr) bool {
+	if ptr1.IpAddress != ptr2.IpAddress {
+		return false
+	}
+	if ptr1.Port != ptr2.Port {
+		return false
+	}
+	return true
 }
 
 func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
@@ -334,21 +436,24 @@ func Notify(nodePtr ChordNodePtr) {
 // (potentially new) successor about ourself.
 func Stabilize() {
 
-	service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	// service := FingerTable[1].IpAddress + ":" + FingerTable[1].Port
 
-	client1, err := jsonrpc.Dial("tcp", service)
-	defer client1.Close()
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-	}
+	// client1, err := jsonrpc.Dial("tcp", service)
+	// defer client1.Close()
+	// if err != nil {
+	// 	fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+	// }
 
 	var getPredecessorReply GetPredecessorReply
 	var args interface{}
-	err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
-		return
-	}
+
+	callRPC("Node.GetPredecessor", &args, &getPredecessorReply, &FingerTable[1])
+
+	// err = client1.Call("Node.GetPredecessor", &args, &getPredecessorReply)
+	// if err != nil {
+	// 	fmt.Println("ERROR: Stabilize() received an error when calling the Node.GetPredecessor RPC: ", err)
+	// 	return
+	// }
 
 	successorsPredecessor := getPredecessorReply.Predecessor
 
@@ -358,23 +463,27 @@ func Stabilize() {
 		}
 	}
 
-	service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
-	client2, err := jsonrpc.Dial("tcp", service)
-	defer client2.Close()
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
-		return
-	}
+	// service = FingerTable[1].IpAddress + ":" + FingerTable[1].Port
+	// client2, err := jsonrpc.Dial("tcp", service)
+	// defer client2.Close()
+	// if err != nil {
+	// 	fmt.Println("ERROR: Stabilize() could not connect to successor node: ", err)
+	// 	return
+	// }
 
 	var notifyArgs NotifyArgs
 	notifyArgs.ChordNodePtr = FingerTable[SELF]
-	var reply interface{}
-	err = client2.Call("Node.Notify", &notifyArgs, &reply)
+	// var reply interface{}
+	var reply NotifyReply
 
-	if err != nil {
-		fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
-		return
-	}
+	callRPC("Node.Notify", &notifyArgs, &reply, &FingerTable[1])
+
+	// err = client2.Call("Node.Notify", &notifyArgs, &reply)
+
+	// if err != nil {
+	// 	fmt.Println("ERROR: Stabilize() received an error when calling the Node.Notify RPC: ", err)
+	// 	return
+	// }
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here

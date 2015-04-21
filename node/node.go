@@ -190,9 +190,10 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 }
 
 // "reply *interface{}" means that no reply is sent.
-func (t *Node) Notify(args *chord.NotifyArgs, reply *interface{}) error {
+func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 	fmt.Println("Notify wrapper called.")
 	chord.Notify(args.ChordNodePtr)
+	reply.Dummy = "Dummy Notify Response"
 	return nil
 }
 
@@ -266,7 +267,7 @@ func main() {
 
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("3s")
+	duration, _ := time.ParseDuration("2s")
 	for {
 		time.Sleep(duration)
 		chord.Stabilize()
