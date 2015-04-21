@@ -108,24 +108,13 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
 
 		//Connect to the successor node of KeyRelID
-		service := keyRelSuccessor.IpAddress + ":" + keyRelSuccessor.Port
-		client, err := jsonrpc.Dial("tcp", service)
-		defer client.Close()
-		if err != nil {
-			fmt.Println("ERROR: Insert() could not connect to keyRelSuccessor node: ", err)
-			reply.TripletInserted = false
-			return err
-		}
 
 		//Copy reply
 		newReply := reply
 
-		//Call remote RPC Insert method
-		err = client.Call("Node.Insert", &args, &newReply)
+		err = chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
-			fmt.Println("ERROR: Insert() could not Insert into remote node ", err)
-			reply.TripletInserted = false
-			return err
+			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
 		}
 
 		//return the reply message

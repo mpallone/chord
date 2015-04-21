@@ -173,9 +173,9 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	chordNodePtrToExistingNode.Port = existingNodePort
 	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
 
-	for callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
-		fmt.Println("FindSuccessor() call in Join failed, trying again after a short delay...")
-		delay("3s")
+	for CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
+		fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
+		Delay("3s")
 	}
 
 	// Set our fingers to point to the successor.
@@ -203,10 +203,10 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 //        function will populate this value with whatever the RPC returns.
 // chordNodePtr: the node to contact
 //
-func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
+func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
 
 	fmt.Println("-------------------------------------------------------")
-	fmt.Println("callRPC() has been called with the following arguments:")
+	fmt.Println("CallRPC() has been called with the following arguments:")
 	fmt.Println("rpcString:", rpcString)
 	fmt.Println("args:", args)
 	fmt.Println("reply:", reply)
@@ -223,7 +223,7 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 		fmt.Println("client isn't nil, attempting to Call it")
 		err = client.Call(rpcString, args, reply)
 		if err != nil {
-			fmt.Println("callRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
+			fmt.Println("CallRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
 			fmt.Println("error received was:", err)
 			callFailed = true
 		}
@@ -235,7 +235,7 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 		client, err = jsonrpc.Dial("tcp", service)
 		if err != nil {
-			fmt.Println("callRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
+			fmt.Println("CallRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
 			return err
 		}
 
@@ -253,17 +253,17 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	err = client.Call(rpcString, args, reply)
 	if err != nil {
-		fmt.Println("callRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
+		fmt.Println("CallRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
 		return err
 	}
 
-	fmt.Println("callRPC() has populated the reply with:", reply)
+	fmt.Println("CallRPC() has populated the reply with:", reply)
 	fmt.Println("------------------------------------------------------")
 
 	return nil
 }
 
-// Helper method for callRPC(), so we can easily tell if a given
+// Helper method for CallRPC(), so we can easily tell if a given
 // ChordNodePtr is one we should maintain a persistent connection
 // with.
 func isFingerOrPredecessor(chordNodePtr *ChordNodePtr) bool {
@@ -282,7 +282,7 @@ func isFingerOrPredecessor(chordNodePtr *ChordNodePtr) bool {
 	return false
 }
 
-// Returns True if a finger or predecessor is nil. The callRPC()
+// Returns True if a finger or predecessor is nil. The CallRPC()
 // function uses this to hold off on closing a connection.
 // FixFingers() will be responsible for cleaning out the connections
 // variable.
@@ -320,7 +320,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	if id == nil {
 		fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
-		delay("10s")                                                    // todo remove
+		Delay("10s")                                                    // todo remove
 		return ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
@@ -344,9 +344,9 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 	var args ChordIDArgs
 	args.Id = id
 
-	err := callRPC("Node.FindSuccessor", &args, &findSuccessorReply, &closestPrecedingFinger)
+	err := CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &closestPrecedingFinger)
 	if err != nil {
-		fmt.Println("callRPC() returned the following error:", err)
+		fmt.Println("CallRPC() returned the following error:", err)
 	}
 
 	return findSuccessorReply.ChordNodePtr, nil
@@ -385,7 +385,7 @@ func Stabilize() {
 	var getPredecessorReply GetPredecessorReply
 	var args interface{}
 
-	callRPC("Node.GetPredecessor", &args, &getPredecessorReply, &FingerTable[1])
+	CallRPC("Node.GetPredecessor", &args, &getPredecessorReply, &FingerTable[1])
 
 	successorsPredecessor := getPredecessorReply.Predecessor
 
@@ -399,7 +399,7 @@ func Stabilize() {
 	notifyArgs.ChordNodePtr = FingerTable[SELF]
 	var reply NotifyReply
 
-	callRPC("Node.Notify", &notifyArgs, &reply, &FingerTable[1])
+	CallRPC("Node.Notify", &notifyArgs, &reply, &FingerTable[1])
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
@@ -433,7 +433,7 @@ func FixFingers() {
 }
 
 // Mostly to slow things down for debugging.
-func delay(delayString string) {
+func Delay(delayString string) {
 	duration, _ := time.ParseDuration(delayString)
 	time.Sleep(duration)
 }
