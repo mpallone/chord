@@ -1,13 +1,15 @@
 #!/bin/bash
 
-if [[ $# < 2 ]]; then
-    echo Usage: $0 "<out_mode> <config_dir> [instancenum.config instancenum.config...]"
+if [[ $# < 3 ]]; then
+    echo Usage: $0 "<out_mode> <config_dir> <client_messages> [instancenum.config instancenum.config...]"
     echo out_mode must be \"gnome-terminal\", \"tmux\", or \"null\"
     exit 1
 fi
 
 out_mode=$1
 config_dir=$2
+client_msgs=`readlink -f $3`
+shift
 shift
 shift
 
@@ -44,10 +46,10 @@ case $out_mode in
         client client.cfg
         ;;
     tmux)
-        tmux new-window -n "CLIENT" "client client.cfg; cat -"
+        tmux new-window -n "CLIENT" "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg; cat -"
         tmux -2 attach-session -d
         ;;
     gnome-terminal)
-	    gnome-terminal -e "${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
+	    gnome-terminal -e "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
         ;;
 esac
