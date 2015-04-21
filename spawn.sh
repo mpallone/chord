@@ -50,6 +50,6 @@ case $out_mode in
         tmux -2 attach-session -d
         ;;
     gnome-terminal)
-	    gnome-terminal -e "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
+	    gnome-terminal -x bash -c "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
         ;;
 esac
