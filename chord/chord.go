@@ -276,14 +276,14 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 		// Only maintain a persistent connection if the node we're contacting is
 		// in our finger table, or if it's our predecessor.
-		//
+
 		// todo - if we implement 'r' predecessors and successors, this code might need
-		//        to be updated to maintain persistent connections to them, too.
-		// if isFingerOrPredecessor(chordNodePtr) || aFingerOrPredecessorIsNil() {
-		// 	connections[service] = client
-		// } else {
-		// 	defer client.Close()
-		// }
+		// to be updated to maintain persistent connections to them, too.
+		if isFingerOrPredecessor(chordNodePtr) || aFingerOrPredecessorIsNil() {
+			connections[service] = client
+		} else {
+			defer client.Close()
+		}
 
 		connections[service] = client
 	}
