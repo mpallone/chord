@@ -251,7 +251,6 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 		}
 	}
 
-	fmt.Println("Bottom of callRPC(), client is:", client)
 	err = client.Call(rpcString, args, reply)
 	if err != nil {
 		fmt.Println("callRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
