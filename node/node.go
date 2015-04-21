@@ -90,19 +90,64 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
-	fmt.Print("  Insert:      ", args.Key, ", ", args.Rel, ", ", args.Val)
+	//create the key and relationship concatenated ID
+	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 
-	// construct temp KeyRelPair
-	krp := KeyRelPair{args.Key, args.Rel}
+	//Find the successor of the KeyRelID
+	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
+	if err != nil {
+		fmt.Println("ERROR: Insert() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
+		reply.TripletInserted = false
+		return err
+	}
 
-	// add key-rel pair if does not exist in dict
-	if _, exists := dict[krp]; !exists {
-		dict[krp] = args.Val
-		reply.TripletInserted = true // default is false
-		fmt.Println(" ... Does not exist in DICT3. Writing new triplet to disk.")
-		writeDictToDisk()
+	//Check if the current node is the successor of keyRelID
+	//if not then make a RPC Insert call on the keyRelID's successor
+	//else insert the args here
+	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
+
+		//Connect to the successor node of KeyRelID
+		service := keyRelSuccessor.IpAddress + ":" + keyRelSuccessor.Port
+		client, err := jsonrpc.Dial("tcp", service)
+		defer client.Close()
+		if err != nil {
+			fmt.Println("ERROR: Insert() could not connect to keyRelSuccessor node: ", err)
+			reply.TripletInserted = false
+			return err
+		}
+
+		//Copy reply
+		newReply := reply
+
+		//Call remote RPC Insert method
+		err = client.Call("Node.Insert", &args, &newReply)
+		if err != nil {
+			fmt.Println("ERROR: Insert() could not Insert into remote node ", err)
+			reply.TripletInserted = false
+			return err
+		}
+
+		//return the reply message
+		reply.TripletInserted = newReply.TripletInserted
+
 	} else {
-		fmt.Println(" ... Triplet already exists in DICT3.")
+
+		//Print insert message
+		fmt.Print("  Inserting:      ", args.Key, ", ", args.Rel, ", ", args.Val)
+
+		// construct temp KeyRelPair
+		krp := KeyRelPair{args.Key, args.Rel}
+
+		// add key-rel pair if does not exist in dict
+		if _, exists := dict[krp]; !exists {
+			dict[krp] = args.Val
+			reply.TripletInserted = true // default is false
+			fmt.Println(" ... Does not exist in DICT3. Writing new triplet to disk.")
+			writeDictToDisk()
+		} else {
+			fmt.Println(" ... Triplet already exists in DICT3.")
+		}
 	}
 	return nil
 }
