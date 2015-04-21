@@ -285,7 +285,7 @@ func callRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 			defer client.Close()
 		}
 
-		connections[service] = client
+		// connections[service] = client
 	}
 
 	// var findSuccessorReply FindSuccessorReply
