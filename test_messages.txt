@@ -10,3 +10,4 @@
 {"method":"Node.Insert","params":[{ "Key":"keyJ", "Rel":"relJ", "Val":{"a":5, "b":6} }], "id":85}
 {"method":"Node.Insert","params":[{ "Key":"keyK", "Rel":"relK", "Val":{"a":5, "b":6} }], "id":85}
 {"method":"Node.Insert","params":[{ "Key":"keyL", "Rel":"relL", "Val":{"a":5, "b":6} }], "id":85}
+
