@@ -63,6 +63,9 @@ type ListKeysReply struct {
 type ListIDsReply struct {
 	IDList []KeyRelPair
 }
+type DeleteReply struct {
+	TripletDeleted bool
+}
 
 // global variable
 var dict = map[KeyRelPair]TripVal{}
@@ -90,6 +93,8 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
+	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
+
 	//create the key and relationship concatenated ID
 	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 
@@ -112,10 +117,16 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		//Copy reply
 		newReply := reply
 
+		fmt.Println("============================================")
+		fmt.Println("The Insert RPC is calling the Node.InsertRPC")
+		fmt.Println("calling node  :", chord.FingerTable[0])
+		fmt.Println("receiving node:", keyRelSuccessor)
 		err = chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
+			return err
 		}
+		fmt.Println("============================================")
 
 		//return the reply message
 		reply.TripletInserted = newReply.TripletInserted
@@ -136,7 +147,9 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 			writeDictToDisk()
 		} else {
 			fmt.Println(" ... Triplet already exists in DICT3.")
+			reply.TripletInserted = false
 		}
+
 	}
 	return nil
 }
@@ -157,15 +170,53 @@ func (t *Node) InsertOrUpdate(args *Args, reply *string) error {
 }
 
 // DELETE(keyA, relA)
-func (t *Node) Delete(args *Args, reply *string) error {
+func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 
 	fmt.Print("  Delete:     ", args.Key, ", ", args.Rel)
 
-	// construct temp KeyRelPair
-	krp := KeyRelPair{args.Key, args.Rel}
-	delete(dict, krp)
-	fmt.Println(" ... Removing deleted triplet from DICT3 and writing to disk.")
-	writeDictToDisk()
+	//create the key and relationship concatenated ID
+	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+
+	//Find the successor of the KeyRelID
+	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
+	if err != nil {
+		fmt.Println("ERROR: Delete() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
+		reply.TripletDeleted = false
+		return err
+	}
+
+	//Check if the current node is the successor of keyRelID
+	//if not then make a RPC Delete call on the keyRelID's successor
+	//else insert the args here
+	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
+
+		//Connect to the successor node of KeyRelID
+
+		//Copy reply
+		newReply := reply
+
+		err = chord.CallRPC("Node.Delete", &args, &newReply, &keyRelSuccessor)
+		if err != nil {
+			fmt.Println("node.go's Delete RPC failed to call the remote node's Delete with error:", err)
+		}
+
+		//return the reply message
+		reply.TripletDeleted = newReply.TripletDeleted
+
+	} else {
+
+		//Print insert message
+		fmt.Print("  Deleting:      ", args.Key, ", ", args.Rel, ", ", args.Val)
+
+		// construct temp KeyRelPair
+		krp := KeyRelPair{args.Key, args.Rel}
+		delete(dict, krp)
+		fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
+		writeDictToDisk()
+		reply.TripletDeleted = true
+	}
+
 	return nil
 }
 
@@ -301,7 +352,7 @@ func main() {
 
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("2s")
+	duration, _ := time.ParseDuration("5s")
 	for {
 		time.Sleep(duration)
 		chord.Stabilize()
