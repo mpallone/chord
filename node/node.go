@@ -117,16 +117,11 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		//Copy reply
 		newReply := reply
 
-		fmt.Println("============================================")
-		fmt.Println("The Insert RPC is calling the Node.InsertRPC")
-		fmt.Println("calling node  :", chord.FingerTable[0])
-		fmt.Println("receiving node:", keyRelSuccessor)
 		err = chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
 			return err
 		}
-		fmt.Println("============================================")
 
 		//return the reply message
 		reply.TripletInserted = newReply.TripletInserted
@@ -352,7 +347,7 @@ func main() {
 
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("5s")
+	duration, _ := time.ParseDuration("2s")
 	for {
 		time.Sleep(duration)
 		chord.Stabilize()

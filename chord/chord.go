@@ -407,7 +407,7 @@ func Stabilize() {
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
 func FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("5s")
+	duration, _ := time.ParseDuration("2s")
 	next := 0
 	for {
 		time.Sleep(duration)
