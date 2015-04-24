@@ -48,6 +48,13 @@ type NotifyReply struct {
 	Dummy string
 }
 
+type TransferKeysArgs struct {
+	ChordNodePtr ChordNodePtr
+}
+type TransferKeysReply struct {
+	Dummy string
+}
+
 // Implements the set membership test used by
 //
 //     find_successor()
@@ -174,7 +181,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
 
 	for CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
-		fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
+		//fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
 		Delay("3s")
 	}
 
@@ -186,7 +193,18 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	FingerTable[1].Port = findSuccessorReply.ChordNodePtr.Port
 	FingerTable[1].ChordID = findSuccessorReply.ChordNodePtr.ChordID
 
-	fmt.Println("Finger table at the end of Join():", FingerTable)
+	//fmt.Println("Finger table at the end of Join():", FingerTable)
+
+	// call TransferKeys on the node that we just discovered is our new successor
+	//   we need to tell the new successor about ourself (IP, Port, and ChordID) so it
+	//   knows where/what are the approrpiate keys to insert on us
+	fmt.Println("Calling TransferKeys on node (my successor): ", FingerTable[1].ChordID)
+	var transferKeysReply TransferKeysReply
+	var argsXfer TransferKeysArgs
+	argsXfer.ChordNodePtr.IpAddress = FingerTable[SELF].IpAddress
+	argsXfer.ChordNodePtr.Port = FingerTable[SELF].Port
+	argsXfer.ChordNodePtr.ChordID = FingerTable[SELF].ChordID
+	CallRPC("Node.TransferKeys", &argsXfer, &transferKeysReply, &FingerTable[1])
 
 	return nil
 }
@@ -205,12 +223,12 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 //
 func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
 
-	fmt.Println("-------------------------------------------------------")
-	fmt.Println("CallRPC() has been called with the following arguments:")
-	fmt.Println("rpcString:", rpcString)
-	fmt.Println("args:", args)
-	fmt.Println("reply:", reply)
-	fmt.Println("chordNodePtr:", chordNodePtr)
+	//fmt.Println("-------------------------------------------------------")
+	//fmt.Println("CallRPC() has been called with the following arguments:")
+	//fmt.Println("rpcString:", rpcString)
+	//fmt.Println("args:", args)
+	//fmt.Println("reply:", reply)
+	//fmt.Println("chordNodePtr:", chordNodePtr)
 
 	// Just to test that my function signature syntax is correct:
 	service := chordNodePtr.IpAddress + ":" + chordNodePtr.Port
@@ -220,11 +238,11 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	client = connections[service]
 	if client != nil {
-		fmt.Println("client isn't nil, attempting to Call it")
+		//fmt.Println("client isn't nil, attempting to Call it")
 		err = client.Call(rpcString, args, reply)
 		if err != nil {
-			fmt.Println("CallRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
-			fmt.Println("error received was:", err)
+			//fmt.Println("CallRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
+			//fmt.Println("error received was:", err)
 			callFailed = true
 		} else {
 			return nil
@@ -233,11 +251,11 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	if client == nil || callFailed {
 
-		fmt.Println("client is nil or the original call failed, attempting to establish a new connection")
+		//fmt.Println("client is nil or the original call failed, attempting to establish a new connection")
 
 		client, err = jsonrpc.Dial("tcp", service)
 		if err != nil {
-			fmt.Println("CallRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
+			//fmt.Println("CallRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
 			return err
 		}
 
@@ -255,12 +273,12 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	err = client.Call(rpcString, args, reply)
 	if err != nil {
-		fmt.Println("CallRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
+		//fmt.Println("CallRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
 		return err
 	}
 
-	fmt.Println("CallRPC() has populated the reply with:", reply)
-	fmt.Println("------------------------------------------------------")
+	//fmt.Println("CallRPC() has populated the reply with:", reply)
+	//fmt.Println("------------------------------------------------------")
 
 	return nil
 }
@@ -318,11 +336,11 @@ func ChordNodePtrsAreEqual(ptr1 *ChordNodePtr, ptr2 *ChordNodePtr) bool {
 
 func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
-	fmt.Println("finding successor of: ", id)
+	//fmt.Println("finding successor of: ", id)
 
 	if id == nil {
-		fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
-		Delay("10s")                                                    // todo remove
+		//fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
+		Delay("10s") // todo remove
 		return ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
@@ -340,7 +358,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 		//closestPrecedingFinger = FingerTable[1]
 	}
 
-	fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
+	//fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
@@ -421,16 +439,16 @@ func FixFingers() {
 		lookupKey := new(big.Int).Add(FingerTable[SELF].ChordID, new(big.Int).Exp(base, exponent, nil))
 		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(mBits)), nil))
 
-		fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
+		//fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
 		successor, err := FindSuccessor(lookupKey)
 		if err != nil {
 			return
 		}
-		fmt.Println("result:", successor)
+		//fmt.Println("result:", successor)
 
 		FingerTable[next] = successor
 
-		fmt.Println("\nFixFingers():", FingerTable)
+		//fmt.Println("\nFixFingers():", FingerTable)
 	}
 }
 

@@ -258,7 +258,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 
 //--------------CHORD WRAPPER METHODS-----------------------------
 func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
-	fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
+	//fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
 
 	var err error
 	reply.ChordNodePtr, err = chord.FindSuccessor(args.Id)
@@ -271,7 +271,7 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 
 // "reply *interface{}" means that no reply is sent.
 func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
-	fmt.Println("Notify wrapper called.")
+	//fmt.Println("Notify wrapper called.")
 	chord.Notify(args.ChordNodePtr)
 	reply.Dummy = "Dummy Notify Response"
 	return nil
@@ -279,8 +279,40 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 
 // Takes no arguments, but does send a reply.
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
-	fmt.Println("GetPredecessor() RPC called.")
+	//fmt.Println("GetPredecessor() RPC called.")
 	reply.Predecessor = chord.Predecessor
+	return nil
+}
+
+func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
+	fmt.Println("TransferKeys() called. May need to transfer some of my keys to node: ", args.ChordNodePtr.ChordID)
+
+	// loop thru local DICT3 and find all keys that need to be transferred
+	for kr, _ := range dict {
+		var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+		// if less than or equal to the joining node's id OR
+		//    if it is greater than Self's node's id (this covers the case of keys wrapping
+		//    around the identifier circle (i.e., Node 41 is the successor to keys 5 and 252)
+		if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
+			fmt.Printf("     Need to transfer Chord Key-Rel ID: %d\n", chordKeyRelID)
+
+			//TODO RPC call to insert this triplet
+			//var insertReply InsertReply
+			//var insertArgs Args
+			//insertArgs.Key = kr.Key
+			//insertArgs.Rel = kr.Rel
+			//insertArgs.Val = v
+			//fmt.Printf("     TransferKeys calling insert RPC on %v ", args.ChordNodePtr)
+			//err := chord.CallRPC("Node.Insert", &insertArgs, &insertReply, &args.ChordNodePtr)
+			//fmt.Println(insertReply.TripletInserted)
+			//if err != nil {
+			//	fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's Insert with error:", err)
+			//	return err
+			//}
+		}
+	}
+	reply.Dummy = "Dummy Transfer Keys Response"
 	return nil
 }
 
@@ -352,9 +384,9 @@ func periodicallyStabilize() {
 		time.Sleep(duration)
 		chord.Stabilize()
 
-		fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
-		fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
-		fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
+		//fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
+		//fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
+		//fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
 }
 
