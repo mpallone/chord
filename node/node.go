@@ -93,7 +93,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
-	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
+	//fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
 
 	//create the key and relationship concatenated ID
 	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
@@ -256,6 +256,27 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 	return nil
 }
 
+// used to allow a node to directly insert key,rel,val on another node without
+// looking up findsuccessor
+func (t *Node) TransferInsert(args *Args, reply *InsertReply) error {
+	fmt.Print("  Transfer Key Insertion:      ", args.Key, ", ", args.Rel, ", ", args.Val)
+
+	// construct temp KeyRelPair
+	krp := KeyRelPair{args.Key, args.Rel}
+
+	// add key-rel pair if does not exist in dict
+	if _, exists := dict[krp]; !exists {
+		dict[krp] = args.Val
+		reply.TripletInserted = true // default is false
+		fmt.Println(" ... Does not exist in DICT3. Writing new triplet to disk.")
+		writeDictToDisk()
+	} else {
+		fmt.Println(" ... Triplet already exists in DICT3.")
+		reply.TripletInserted = false
+	}
+	return nil
+}
+
 //--------------CHORD WRAPPER METHODS-----------------------------
 func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
 	//fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
@@ -285,34 +306,39 @@ func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorRepl
 }
 
 func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
-	fmt.Println("TransferKeys() called. May need to transfer some of my keys to node: ", args.ChordNodePtr.ChordID)
+	fmt.Println("TransferKeys() called. Checking to see if I need to transfer some of my keys to node: ", args.ChordNodePtr.ChordID)
 
 	// loop thru local DICT3 and find all keys that need to be transferred
-	for kr, _ := range dict {
+	for kr, v := range dict {
 		var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
 
 		// if less than or equal to the joining node's id OR
-		//    if it is greater than Self's node's id (this covers the case of keys wrapping
-		//    around the identifier circle (i.e., Node 41 is the successor to keys 5 and 252)
+		// if it is greater than Self's node's id (this covers the case of keys wrapping
+		// around the identifier circle (i.e., Node 41 is the successor to keys 5 and 252)
 		if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
 			fmt.Printf("     Need to transfer Chord Key-Rel ID: %d\n", chordKeyRelID)
 
-			//TODO RPC call to insert this triplet
-			//var insertReply InsertReply
-			//var insertArgs Args
-			//insertArgs.Key = kr.Key
-			//insertArgs.Rel = kr.Rel
-			//insertArgs.Val = v
-			//fmt.Printf("     TransferKeys calling insert RPC on %v ", args.ChordNodePtr)
-			//err := chord.CallRPC("Node.Insert", &insertArgs, &insertReply, &args.ChordNodePtr)
-			//fmt.Println(insertReply.TripletInserted)
-			//if err != nil {
-			//	fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's Insert with error:", err)
-			//	return err
-			//}
+			// RPC call to insert this triplet
+			var insertReply InsertReply
+			var insertArgs Args
+			insertArgs.Key = kr.Key
+			insertArgs.Rel = kr.Rel
+			insertArgs.Val = v
+			fmt.Printf("     TransferKeys calling TransferInsert RPC on %v ", args.ChordNodePtr)
+
+			// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
+			// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
+			// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
+			err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
+			fmt.Println("     Result of transfer and insertion of triplet: ", insertReply)
+			if err != nil {
+				fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
+				reply.TransferKeysCompleted = false
+				return err
+			}
 		}
 	}
-	reply.Dummy = "Dummy Transfer Keys Response"
+	reply.TransferKeysCompleted = true
 	return nil
 }
 
@@ -357,9 +383,13 @@ func main() {
 		// contact CreatedNode and pass in my own chord ID
 		// todo - this hard-coded stuff should really be in the config file
 		duration, _ := time.ParseDuration("3s")
-		for chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port) != nil {
-			time.Sleep(duration)
-		}
+		//for chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port) != nil {
+
+		// introduce a little delay to allow the listener to get up first before attempting
+		// to join, otherwise this node will not be able to have its keys inserted via
+		// the TransferKeys RPC (there has to be a better way to do this...)
+		time.Sleep(duration)
+		go chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port)
 	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")

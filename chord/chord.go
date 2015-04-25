@@ -52,7 +52,7 @@ type TransferKeysArgs struct {
 	ChordNodePtr ChordNodePtr
 }
 type TransferKeysReply struct {
-	Dummy string
+	TransferKeysCompleted bool
 }
 
 // Implements the set membership test used by
@@ -198,13 +198,18 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	// call TransferKeys on the node that we just discovered is our new successor
 	//   we need to tell the new successor about ourself (IP, Port, and ChordID) so it
 	//   knows where/what are the approrpiate keys to insert on us
-	fmt.Println("Calling TransferKeys on node (my successor): ", FingerTable[1].ChordID)
+	fmt.Println("Calling TransferKeys on node (my newly discovered successor): ", FingerTable[1].ChordID)
 	var transferKeysReply TransferKeysReply
 	var argsXfer TransferKeysArgs
 	argsXfer.ChordNodePtr.IpAddress = FingerTable[SELF].IpAddress
 	argsXfer.ChordNodePtr.Port = FingerTable[SELF].Port
 	argsXfer.ChordNodePtr.ChordID = FingerTable[SELF].ChordID
-	CallRPC("Node.TransferKeys", &argsXfer, &transferKeysReply, &FingerTable[1])
+	err := CallRPC("Node.TransferKeys", &argsXfer, &transferKeysReply, &FingerTable[1])
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println("Result of transferKeys operation: ", transferKeysReply.TransferKeysCompleted)
 
 	return nil
 }

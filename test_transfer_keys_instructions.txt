@@ -1,0 +1,12 @@
+proj2~] ./tester.sh gnome-terminal testdir test_messages.txt 3
+
+# (wait ~8 seconds for finger tables to update)
+
+press ctrl-d in client window to insert all of our test messages
+
+# open a new gnome-terminal and cd to proj2/joining_node directory
+
+proj2/joining_node~]./start_joining.sh
+
+# Chord keys 5 and 252 should have been inserted on the joining node 
+
