@@ -342,6 +342,47 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 	return nil
 }
 
+// this is called immediately after Stabilize() has completed and checks the local DICT3 for any Triplets that might
+// need to be deleted because they were just copied as part of TransferKeys().  Any keys found to belong to the predecessor are deleted
+func (t *Node) DeleteTransferredKeys(args *chord.DeleteTransferredKeysArgs, reply *chord.DeleteTransferredKeysReply) error {
+	//fmt.Printf("Stabilize completed - Now checking if i need to delete any duplicate keys that may have been transfererd to: %+v\n", args.ChordNodePtr)
+
+	//check local DICT3 for keys that should be deleted
+
+	// if my predecessor has a NodeID < me
+	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) < 0 {
+		for kr, _ := range dict {
+			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+			//delete key if keyID <= predecessor OR keyID > me
+			if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
+				fmt.Printf("     Duplicate key - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
+
+				// delete the triplet
+				delete(dict, kr)
+				writeDictToDisk()
+			}
+		}
+	}
+
+	// if my predecessor has a NodeID > me:
+	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) > 0 {
+		for kr, _ := range dict {
+			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+			//delete key if KeyID <= predID AND keyID > me
+			if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) && (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
+				fmt.Printf("     Duplicate key - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
+
+				// delete the triplet
+				delete(dict, kr)
+				writeDictToDisk()
+			}
+		}
+	}
+	return nil
+}
+
 //--------------CHORD WRAPPER METHODS-----------------------------
 
 func main() {
@@ -378,7 +419,7 @@ func main() {
 	// bootstrap, first node with port number 7001 creates the ring, and the rest join
 	if conf.Port == "7001" {
 		chord.Create(conf.IpAddress, conf.Port)
-		fmt.Println("Finger Table: ", chord.FingerTable)
+		//fmt.Println("Finger Table: ", chord.FingerTable)
 	} else {
 		// contact CreatedNode and pass in my own chord ID
 		// todo - this hard-coded stuff should really be in the config file
@@ -388,6 +429,7 @@ func main() {
 		// introduce a little delay to allow the listener to get up first before attempting
 		// to join, otherwise this node will not be able to have its keys inserted via
 		// the TransferKeys RPC (there has to be a better way to do this...)
+		// TODO at least need to put back the looping until connection success
 		time.Sleep(duration)
 		go chord.Join("127.0.0.1", "7001", conf.IpAddress, conf.Port)
 	}

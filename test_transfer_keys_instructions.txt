@@ -6,7 +6,13 @@ press ctrl-d in client window to insert all of our test messages
 
 # open a new gnome-terminal and cd to proj2/joining_node directory
 
-proj2/joining_node~]./start_joining.sh
+proj2/joining_node~]./start_joining_node.sh
 
-# Chord keys 5 and 252 should have been inserted on the joining node 
+# Chord keys 5 and 252 should have been inserted on the joining node (node 20) and deleted on node 41 
 
+# now start the second joining node (Node 227)
+proj2/joining_node2~]./start_joining_node.sh
+
+# all chord keys on node 245 should be deleted and inserted on Node 227
+
+(can killall -INT nodes, and then restart to see if the right keys were deleted/inserted on the DICT3 on disk)

@@ -51,8 +51,14 @@ type NotifyReply struct {
 type TransferKeysArgs struct {
 	ChordNodePtr ChordNodePtr
 }
+type DeleteTransferredKeysArgs struct {
+	ChordNodePtr ChordNodePtr
+}
 type TransferKeysReply struct {
 	TransferKeysCompleted bool
+}
+type DeleteTransferredKeysReply struct {
+	TransferKeysDeleted bool
 }
 
 // Implements the set membership test used by
@@ -425,6 +431,19 @@ func Stabilize() {
 	var reply NotifyReply
 
 	CallRPC("Node.Notify", &notifyArgs, &reply, &FingerTable[1])
+
+	// if i am a new node, at this point, my predecessor should now know about me, and safe
+	// to tell my suceessor to delete any duplicate keys that it just transferred to me
+	//   (call DeleteTransferredKeys() on successor - which checks for any keys that it should
+	//    delete as old duplicates because they have just been transferred)
+	// TODO -- to make this more robust, loop until we are sure that stabilize has finished on other immediate
+	// neighboring nodes before calling DeleteTransferredKeys(); this might be in the form of a check to make
+	// sure my predecessor's successor points to me, and my successor's predecessor also points to me)
+	var deleteTransferredKeysArgs DeleteTransferredKeysArgs
+	deleteTransferredKeysArgs.ChordNodePtr = FingerTable[SELF]
+	var deleteTransferredKeysReply DeleteTransferredKeysReply
+	CallRPC("Node.DeleteTransferredKeys", &deleteTransferredKeysArgs, &deleteTransferredKeysReply, &FingerTable[1])
+
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
