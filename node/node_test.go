@@ -1,17 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"github.com/robcs621/proj2/chord"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
-	"fmt"
-	"strconv"
 )
 
 func TestKeyLocation(t *testing.T) {
-	numNodes := 1
-	numEntries := 512
+	const numNodes = 4
+	const numEntries = 512
+	const fingerTableSize = 9
 
 	//Make some test data
 	entries := make([]string, numEntries)
@@ -42,10 +43,32 @@ func TestKeyLocation(t *testing.T) {
 	}
 
 	//Wait for a stable network
-	stable := true
-	for !stable {
-		time.Sleep(time.Second)
+	stable := false
+	lastState := make([][]chord.ChordNodePtr, numNodes)
+	for i := 0; i < numNodes; i++ {
+		lastState[i] = make([]chord.ChordNodePtr, 9)
+		for nodes[i].chord == nil {
+			fmt.Print("")
+		}
+		for len(nodes[i].chord.FingerTable) == 0 {
+			fmt.Print("")
+		}
+		copy(lastState[i], nodes[i].chord.FingerTable[:])
 	}
+	fmt.Println("Stabilizing...")
+	for !stable {
+		time.Sleep(8 * time.Second)
+		stable = true
+		for i := 0; i < numNodes; i++ {
+			for itemno, el := range nodes[i].chord.FingerTable {
+				if lastState[i][itemno] != el {
+					stable = false
+				}
+			}
+			copy(lastState[i], nodes[i].chord.FingerTable[:])
+		}
+	}
+	fmt.Println("Stable")
 
 	//Test
 
