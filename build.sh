@@ -9,6 +9,5 @@ pkgs="
 for p in $pkgs; do
     echo Building $p
     go fmt $p && \
-    go test $p && \
     go install $p || exit
 done

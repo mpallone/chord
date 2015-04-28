@@ -8,5 +8,5 @@ pkgs="
 "
 for p in $pkgs; do
     echo Testing $p
-    go test $p || exit 1
+    go test $p -test.v || exit 1
 done
