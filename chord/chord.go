@@ -215,7 +215,6 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println("Result of transferKeys operation: ", transferKeysReply.TransferKeysCompleted)
 
 	return nil
 }
@@ -442,7 +441,10 @@ func Stabilize() {
 	var deleteTransferredKeysArgs DeleteTransferredKeysArgs
 	deleteTransferredKeysArgs.ChordNodePtr = FingerTable[SELF]
 	var deleteTransferredKeysReply DeleteTransferredKeysReply
-	CallRPC("Node.DeleteTransferredKeys", &deleteTransferredKeysArgs, &deleteTransferredKeysReply, &FingerTable[1])
+	err := CallRPC("Node.DeleteTransferredKeys", &deleteTransferredKeysArgs, &deleteTransferredKeysReply, &FingerTable[1])
+	if err != nil {
+		fmt.Println(err)
+	}
 
 }
 
