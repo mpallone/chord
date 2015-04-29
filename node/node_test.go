@@ -78,7 +78,6 @@ func TestKeyLocation(t *testing.T) {
 		}
 	}
 	fmt.Println("node_test.go: Stable")
-	return
 
 	//Identify nodes
 	nodeIds := make([]int, numNodes)
