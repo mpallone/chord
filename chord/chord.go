@@ -43,9 +43,10 @@ const mBits int = 8
 const SELF int = 0
 
 type Chord struct {
-	Predecessor ChordNodePtr
-	FingerTable [mBits + 1]ChordNodePtr
-	connections map[string]*rpc.Client
+	Predecessor       ChordNodePtr
+	FingerTable       [mBits + 1]ChordNodePtr
+	StabilizeDuration time.Duration
+	connections       map[string]*rpc.Client
 }
 
 // Implements the set membership test used by
@@ -137,7 +138,6 @@ func GetChordID(str string) *big.Int {
 	//fmt.Printf("Chord ID (dec): %d\n", chordID)
 
 	return chordID
-
 }
 
 func gimmeAChord() *Chord {
@@ -151,13 +151,12 @@ func Create(ip string, port string) *Chord {
 
 	// first entry in finger table is set to itself
 	// first node is its own successor since no other nodes yet in the ring
-	t.FingerTable[SELF].IpAddress = ip
-	t.FingerTable[SELF].Port = port
-	t.FingerTable[SELF].ChordID = GetChordID(ip + ":" + port)
-
-	t.FingerTable[1].IpAddress = ip
-	t.FingerTable[1].Port = port
-	t.FingerTable[1].ChordID = GetChordID(ip + ":" + port)
+	// Init the pointer to ourself. Assume we own all pointers until we find otherwise. (fixes infinite loop between nodes)
+	for i := 0; i < len(t.FingerTable); i++ {
+		t.FingerTable[i].IpAddress = ip
+		t.FingerTable[i].Port = port
+		t.FingerTable[i].ChordID = GetChordID(ip + ":" + port)
+	}
 	return t
 }
 
@@ -168,10 +167,12 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	fmt.Println("Joining chord ring...")
 	fmt.Println("Making RPC call to: ", existingNodeIP, ":", existingNodePort)
 
-	// Init the pointer to ourself
-	t.FingerTable[SELF].IpAddress = myIp
-	t.FingerTable[SELF].Port = myPort
-	t.FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
+	// Init the pointer to ourself. Assume we own all pointers until we find otherwise. (fixes infinite loop between nodes)
+	for i := 0; i < len(t.FingerTable); i++ {
+		t.FingerTable[i].IpAddress = myIp
+		t.FingerTable[i].Port = myPort
+		t.FingerTable[i].ChordID = GetChordID(myIp + ":" + myPort)
+	}
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
@@ -184,7 +185,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 
 	for t.CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
 		fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
-		Delay("3s")
+		time.Sleep(3 * t.StabilizeDuration)
 	}
 
 	// Set our fingers to point to the successor.
@@ -330,7 +331,6 @@ func (t *Chord) FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 	if id == nil {
 		fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
-		Delay("10s")                                                    // todo remove
 		return ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
@@ -415,10 +415,9 @@ func (t *Chord) Stabilize() {
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
 func (t *Chord) FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("2s")
 	next := 0
 	for {
-		time.Sleep(duration)
+		time.Sleep(t.StabilizeDuration)
 		next += 1
 		if next > mBits {
 			next = 1
@@ -440,10 +439,4 @@ func (t *Chord) FixFingers() {
 
 		fmt.Println("\nFixFingers():", t.FingerTable)
 	}
-}
-
-// Mostly to slow things down for debugging.
-func Delay(delayString string) {
-	duration, _ := time.ParseDuration(delayString)
-	time.Sleep(duration)
 }

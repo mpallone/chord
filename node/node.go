@@ -31,10 +31,11 @@ type ServerConfiguration struct {
 }
 
 type Node struct {
-	conf   ServerConfiguration
-	dict   map[KeyRelPair]TripVal
-	listen bool
-	chord  *chord.Chord
+	stabilizeDuration time.Duration
+	conf              ServerConfiguration
+	dict              map[KeyRelPair]TripVal
+	listen            bool
+	chord             *chord.Chord
 }
 
 type TripKey string
@@ -297,6 +298,7 @@ func main() {
 
 	// run node
 	node := new(Node)
+	node.stabilizeDuration = 2 * time.Second
 	node.run(conf)
 }
 
@@ -332,7 +334,7 @@ func (t *Node) run(conf ServerConfiguration) {
 		// contact CreatedNode and pass in my own chord ID
 		t.chord = chord.Join("127.0.0.1", "7001", t.conf.IpAddress, t.conf.Port)
 	}
-
+	t.chord.StabilizeDuration = t.stabilizeDuration
 	fmt.Printf("Listening on port " + t.conf.Port + " ...\n")
 
 	go t.periodicallyStabilize()
@@ -350,9 +352,8 @@ func (t *Node) run(conf ServerConfiguration) {
 
 func (t *Node) periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("2s")
 	for {
-		time.Sleep(duration)
+		time.Sleep(t.stabilizeDuration)
 		t.chord.Stabilize()
 
 		fmt.Println("periodicallyStabilize(), predecess:", t.chord.Predecessor)
