@@ -339,8 +339,10 @@ func (t *Chord) FindSuccessor(id *big.Int) (*ChordNodePtr, error) {
 		return &ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
-	if Inclusive_in(id, addOne(t.FingerTable[SELF].ChordID), t.FingerTable[1].ChordID) {
-		return t.FingerTable[1], nil
+	for i := 1; i <= mBits && t.FingerTable[i] != nil; i++{
+		if Inclusive_in(id, addOne(t.FingerTable[i - 1].ChordID), t.FingerTable[i].ChordID) {
+			return t.FingerTable[i], nil
+		}
 	}
 
 	closestPrecedingFinger := t.closestPrecedingNode(id)
@@ -348,9 +350,9 @@ func (t *Chord) FindSuccessor(id *big.Int) (*ChordNodePtr, error) {
 	// TODO If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
 	// at the top of this function didn't work, and also that our finger table isn't yet correct. So,
 	// ask our successor to find the node for us in this case.
-	if closestPrecedingFinger.ChordID == t.FingerTable[0].ChordID {
+	if closestPrecedingFinger == t.FingerTable[SELF] {
 		fmt.Println("FINDSUCCESSOR!! THIS SHOULD NEVER HAPPEN!!! DELETE ME??")
-		closestPrecedingFinger = t.FingerTable[1]
+		return t.FingerTable[SELF], nil
 	}
 
 	fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
@@ -375,12 +377,12 @@ func (t *Chord) closestPrecedingNode(id *big.Int) *ChordNodePtr {
 			myId := t.FingerTable[SELF].ChordID
 			currentFingerId := t.FingerTable[i].ChordID
 
-			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
+			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) && currentFingerId != myId {
 				return t.FingerTable[i]
 			}
 		}
 	}
-	return t.FingerTable[SELF]
+	return nil
 }
 
 // nodePtr thinks it might be our successor
@@ -404,7 +406,7 @@ func (t *Chord) Stabilize() {
 
 	successorsPredecessor := &getPredecessorReply.Predecessor
 
-	if successorsPredecessor != nil {
+	if successorsPredecessor != nil && successorsPredecessor != t.FingerTable[SELF]{
 		if Inclusive_in(successorsPredecessor.ChordID, addOne(t.FingerTable[SELF].ChordID), subOne(t.FingerTable[1].ChordID)) {
 			t.FingerTable[1] = successorsPredecessor
 		}
@@ -440,7 +442,9 @@ func (t *Chord) FixFingers() {
 		}
 		fmt.Println("result:", *successor)
 
-		t.FingerTable[next] = successor
+		if successor != t.FingerTable[SELF]{
+			t.FingerTable[next] = successor
+		}
 
 		fmt.Print("\nFixFingers():[")
 		for i := 0; i < mBits+1; i++ {

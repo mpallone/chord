@@ -94,7 +94,6 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
 	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
-	return nil
 
 	//create the key and relationship concatenated ID
 	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))

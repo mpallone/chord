@@ -11,10 +11,10 @@ import (
 
 func TestKeyLocation(t *testing.T) {
 	//const numNodes = 20 //TODO: 21 nodes = collision
-	const numNodes = 8 //TODO: 21 nodes = collision
-	const numEntries = 512
+	const numNodes = 2 //TODO: 21 nodes = collision
+	const numEntries = 16
 	const fingerTableSize = 9
-	const duration = 2000 * time.Millisecond
+	const duration = 1000 * time.Millisecond
 
 	//Make some test data
 	entries := make([]Args, numEntries)
@@ -65,20 +65,17 @@ func TestKeyLocation(t *testing.T) {
 		for j := 0; j < fingerTableSize; j++ {
 			if nodes[i].chord.FingerTable[j] != nil {
 				cnp := *nodes[i].chord.FingerTable[j]
-				cnp2 := cnp
-				lastState[i][j] = &cnp2
+				lastState[i][j] = &cnp
 			}
 		}
 	}
 	fmt.Println("node_test.go: Stabilizing...")
 	for !stable {
-		//fmt.Print("node_test.go: ")
-		//fmt.Println(lastState)
 		time.Sleep((fingerTableSize) * duration)
 		stable = true
 		for i := 0; i < numNodes; i++ {
-			for itemno, el := range nodes[i].chord.FingerTable {
-				if lastState[i][itemno] != el {
+			for j := 0; j < fingerTableSize; j++ {
+				if lastState[i][j] == nil || *lastState[i][j] != *nodes[i].chord.FingerTable[j]{
 					stable = false
 					break
 				}
@@ -86,8 +83,7 @@ func TestKeyLocation(t *testing.T) {
 			for j := 0; j < fingerTableSize; j++ {
 				if nodes[i].chord.FingerTable[j] != nil {
 					cnp := *nodes[i].chord.FingerTable[j]
-					cnp2 := cnp
-					lastState[i][j] = &cnp2
+					lastState[i][j] = &cnp
 				}
 			}
 		}
