@@ -342,62 +342,6 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 	return nil
 }
 
-// this is called immediately after Stabilize() has completed and checks the local DICT3 for any Triplets that might
-// need to be deleted because they were just copied as part of TransferKeys().  Any keys found to belong to the predecessor are deleted
-func (t *Node) DeleteTransferredKeys(args *chord.DeleteTransferredKeysArgs, reply *chord.DeleteTransferredKeysReply) error {
-	//fmt.Printf("Stabilize completed - Now checking if i need to delete any duplicate keys that may have been transfererd to: %+v\n", args.ChordNodePtr)
-
-	//check local DICT3 for keys that should be deleted
-
-	// if my predecessor has a NodeID < me
-	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) < 0 {
-		for kr, _ := range dict {
-			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
-
-			//delete key if keyID <= predecessor OR keyID > me
-			if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
-				fmt.Printf("     Duplicate key - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
-
-				// delete the triplet
-				delete(dict, kr)
-				writeDictToDisk()
-			}
-		}
-	}
-
-	// if my predecessor has a NodeID > me:
-	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) > 0 {
-		for kr, _ := range dict {
-			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
-
-			//delete key if KeyID <= predID AND keyID > me
-			if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) && (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
-				fmt.Printf("     Duplicate key - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
-
-				// delete the triplet
-				delete(dict, kr)
-				writeDictToDisk()
-			}
-		}
-	}
-	// -- DEBUG REMOVE
-	var numKeys int = 0
-	fmt.Println("------------------------")
-	fmt.Printf("Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
-	fmt.Println("DICT3 contents are now: ")
-	for k, v := range dict {
-		var chordKey = string(k.Key) + string(k.Rel)
-		fmt.Printf(" (%d)", chord.GetChordID(chordKey))
-		fmt.Println("  ", k, v)
-		numKeys++
-	}
-	fmt.Println("Total triplets: ", numKeys)
-	fmt.Println("------------------------")
-	// -- DEBUG REMOVE
-
-	return nil
-}
-
 //--------------CHORD WRAPPER METHODS-----------------------------
 
 func main() {
@@ -478,11 +422,70 @@ func periodicallyStabilize() {
 	for {
 		time.Sleep(duration)
 		chord.Stabilize()
+		deleteAnyTransferredKeys()
 
 		//fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
 		//fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
 		//fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
+}
+
+// this is called immediately after Stabilize() has completed and checks the local DICT3 for any Triplets that might
+// need to be deleted because they were just copied as part of TransferKeys().  Any keys found to belong to the predecessor are deleted
+func deleteAnyTransferredKeys() error {
+	fmt.Println("Stabilize completed - Now checking if i need to delete any duplicate keys that may have been transferred")
+
+	// ensure stabilize has completed and a predecessor exists, otherwise null pointer dereference
+	if chord.Predecessor.ChordID != nil {
+
+		// if my predecessor has a NodeID < me
+		if chord.Predecessor.ChordID.Cmp(chord.FingerTable[0].ChordID) < 0 {
+			for kr, _ := range dict {
+				var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+				//delete key if keyID <= predecessor OR keyID > me
+				if (chordKeyRelID.Cmp(chord.Predecessor.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
+					fmt.Printf("     Duplicate key found - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
+
+					// delete the triplet and write to disk
+					delete(dict, kr)
+					writeDictToDisk()
+				}
+			}
+		}
+
+		// if my predecessor has a NodeID > me:
+		if chord.Predecessor.ChordID.Cmp(chord.FingerTable[0].ChordID) > 0 {
+			for kr, _ := range dict {
+				var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+				//delete key if KeyID <= predID AND keyID > me
+				if (chordKeyRelID.Cmp(chord.Predecessor.ChordID) <= 0) && (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
+					fmt.Printf("     Duplicate key found - need to delete in my local DICT3 Chord Key-Rel ID: %d\n", chordKeyRelID)
+
+					// delete the triplet and write to disk
+					delete(dict, kr)
+					writeDictToDisk()
+				}
+			}
+		}
+	}
+
+	// -- DEBUG REMOVE
+	var numKeys int = 0
+	fmt.Printf("Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
+	fmt.Println("DICT3 contents are now: ")
+	for k, v := range dict {
+		var chordKey = string(k.Key) + string(k.Rel)
+		fmt.Printf(" (%d)", chord.GetChordID(chordKey))
+		fmt.Println("  ", k, v)
+		numKeys++
+	}
+	fmt.Println("Total triplets: ", numKeys)
+	fmt.Println("------------------------")
+	// -- DEBUG REMOVE
+
+	return nil
 }
 
 func writeDictToDisk() {
