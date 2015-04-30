@@ -11,10 +11,10 @@ import (
 
 func TestKeyLocation(t *testing.T) {
 	//const numNodes = 20 //TODO: 21 nodes = collision
-	const numNodes = 2 //TODO: 21 nodes = collision
+	const numNodes = 8 //TODO: 21 nodes = collision
 	const numEntries = 512
 	const fingerTableSize = 9
-	const duration = time.Millisecond
+	const duration = 2000 * time.Millisecond
 
 	//Make some test data
 	entries := make([]Args, numEntries)
@@ -42,6 +42,8 @@ func TestKeyLocation(t *testing.T) {
 		conf.Port = strconv.Itoa(7001 + i)
 		conf.PersistentStorageContainer.File = "/dev/null"
 		conf.ServerID = conf.IpAddress + ":" + conf.Port
+		conf.Methods = []string{"lookup", "insert", "insertOrUpdate", "delete", "listKeys", "listIDs", "shutdown"}
+		fmt.Println("node_test.go: Config ", conf)
 
 		n := new(Node)
 		n.stabilizeDuration = duration
@@ -51,30 +53,43 @@ func TestKeyLocation(t *testing.T) {
 
 	//Wait for a stable network
 	stable := false
-	lastState := make([][]chord.ChordNodePtr, numNodes)
+	lastState := make([][]*chord.ChordNodePtr, numNodes)
 	for i := 0; i < numNodes; i++ {
-		lastState[i] = make([]chord.ChordNodePtr, 9)
+		lastState[i] = make([]*chord.ChordNodePtr, fingerTableSize)
 		for nodes[i].chord == nil {
 			fmt.Print("")
 		}
 		for len(nodes[i].chord.FingerTable) == 0 {
 			fmt.Print("")
 		}
-		copy(lastState[i], nodes[i].chord.FingerTable[:])
+		for j := 0; j < fingerTableSize; j++ {
+			if nodes[i].chord.FingerTable[j] != nil {
+				cnp := *nodes[i].chord.FingerTable[j]
+				cnp2 := cnp
+				lastState[i][j] = &cnp2
+			}
+		}
 	}
 	fmt.Println("node_test.go: Stabilizing...")
 	for !stable {
 		//fmt.Print("node_test.go: ")
 		//fmt.Println(lastState)
-		time.Sleep((fingerTableSize + 1) * duration)
+		time.Sleep((fingerTableSize) * duration)
 		stable = true
 		for i := 0; i < numNodes; i++ {
 			for itemno, el := range nodes[i].chord.FingerTable {
 				if lastState[i][itemno] != el {
 					stable = false
+					break
 				}
 			}
-			copy(lastState[i], nodes[i].chord.FingerTable[:])
+			for j := 0; j < fingerTableSize; j++ {
+				if nodes[i].chord.FingerTable[j] != nil {
+					cnp := *nodes[i].chord.FingerTable[j]
+					cnp2 := cnp
+					lastState[i][j] = &cnp2
+				}
+			}
 		}
 	}
 	fmt.Println("node_test.go: Stable")
@@ -119,9 +134,9 @@ func TestKeyLocation(t *testing.T) {
 		for i := 0; i < numNodes; i++ {
 			id, _ := strconv.Atoi(nodes[i].chord.FingerTable[chord.SELF].ChordID.String())
 			if id == fakeLoc {
-				krp := KeyRelPair{entries[i].Key, entries[i].Rel}
+				krp := KeyRelPair{entries[e].Key, entries[e].Rel}
 				if _, exists := nodes[i].dict[krp]; !exists {
-					t.Errorf("KRP not inserted in expected node: " + strconv.Itoa(lastId))
+					t.Errorf("KRP (", krp, ") not inserted in expected node: "+strconv.Itoa(id))
 				}
 				break
 			}

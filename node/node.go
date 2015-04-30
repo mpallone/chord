@@ -94,6 +94,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
 	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
+	return nil
 
 	//create the key and relationship concatenated ID
 	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
@@ -117,7 +118,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		//Copy reply
 		newReply := reply
 
-		err = t.chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
+		err = t.chord.CallRPC("Node.Insert", &args, &newReply, keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
 			return err
@@ -191,7 +192,7 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 		//Copy reply
 		newReply := reply
 
-		err = t.chord.CallRPC("Node.Delete", &args, &newReply, &keyRelSuccessor)
+		err = t.chord.CallRPC("Node.Delete", &args, &newReply, keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Delete RPC failed to call the remote node's Delete with error:", err)
 		}
@@ -261,7 +262,8 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 	fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
 
 	var err error
-	reply.ChordNodePtr, err = t.chord.FindSuccessor(args.Id)
+	suc, err := t.chord.FindSuccessor(args.Id)
+	reply.ChordNodePtr = *suc
 	if err != nil {
 		fmt.Println("FindSuccessor() RPC received an error when calling chord.FindSuccessor()")
 	}
@@ -272,7 +274,7 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 // "reply *interface{}" means that no reply is sent.
 func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 	fmt.Println("Notify wrapper called.")
-	t.chord.Notify(args.ChordNodePtr)
+	t.chord.Notify(&args.ChordNodePtr)
 	reply.Dummy = "Dummy Notify Response"
 	return nil
 }
@@ -280,7 +282,7 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 // Takes no arguments, but does send a reply.
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	fmt.Println("GetPredecessor() RPC called.")
-	reply.Predecessor = t.chord.Predecessor
+	reply.Predecessor = *t.chord.Predecessor
 	return nil
 }
 
