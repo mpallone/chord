@@ -256,6 +256,81 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 	return nil
 }
 
+// invoked on an existing node in the chord ring by a joining node.  the joining node passes its IP, Port, NodeID (as a ChordNodePtr)
+// to the existing node, which then uses that information to determine which keys need to be moved to the joining node.
+func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
+	fmt.Println("TransferKeys() called. Checking to see if I need to transfer some of my keys to: Node", args.ChordNodePtr.ChordID)
+
+	var numKeysTransferred = 0
+
+	// if joining_node.ID > my.ID (e.g., 99 joining ring with 41)
+	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) > 0 {
+
+		// loop thru local DICT3 and find all keys that need to be transferred
+		for kr, v := range dict {
+			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+			// transfer: key.ID > my.ID && keyID <= joining_node.ID
+			if (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) && (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) {
+
+				// RPC call to insert this triplet
+				var insertReply InsertReply
+				var insertArgs Args
+				insertArgs.Key = kr.Key
+				insertArgs.Rel = kr.Rel
+				insertArgs.Val = v
+
+				// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
+				// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
+				// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
+				err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
+				if err != nil {
+					fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
+					reply.TransferKeysCompleted = false
+					return err
+				}
+				numKeysTransferred++
+			}
+		}
+	}
+
+	// if joining_node.ID < my.ID (e.g., 20 joining ring with 41)
+	if args.ChordNodePtr.ChordID.Cmp(chord.FingerTable[0].ChordID) < 0 {
+
+		// loop thru local DICT3 and find all keys that need to be transferred
+		for kr, v := range dict {
+			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+
+			// transfer: key.ID > my.ID || keyID <= joining_node.ID
+			if (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) || (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) {
+
+				// RPC call to insert this triplet
+				var insertReply InsertReply
+				var insertArgs Args
+				insertArgs.Key = kr.Key
+				insertArgs.Rel = kr.Rel
+				insertArgs.Val = v
+
+				// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
+				// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
+				// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
+				err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
+				if err != nil {
+					fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
+					reply.TransferKeysCompleted = false
+					return err
+				}
+				numKeysTransferred++
+			}
+		}
+	}
+
+	fmt.Printf("Number of keys transferred: %d\n", numKeysTransferred)
+
+	reply.TransferKeysCompleted = true
+	return nil
+}
+
 // used to allow a node to directly insert key,rel,val on another node without
 // looking up findsuccessor
 func (t *Node) TransferInsert(args *Args, reply *InsertReply) error {
@@ -305,40 +380,6 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	//fmt.Println("GetPredecessor() RPC called.")
 	reply.Predecessor = chord.Predecessor
-	return nil
-}
-
-func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
-	fmt.Println("TransferKeys() called. Checking to see if I need to transfer some of my keys to node: ", args.ChordNodePtr.ChordID)
-
-	// loop thru local DICT3 and find all keys that need to be transferred
-	for kr, v := range dict {
-		var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
-
-		// if less than or equal to the joining node's id OR
-		// if it is greater than Self's node's id (this covers the case of keys wrapping
-		// around the identifier circle (i.e., Node 41 is the successor to keys 5 and 252)
-		if (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
-
-			// RPC call to insert this triplet
-			var insertReply InsertReply
-			var insertArgs Args
-			insertArgs.Key = kr.Key
-			insertArgs.Rel = kr.Rel
-			insertArgs.Val = v
-
-			// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
-			// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
-			// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
-			err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
-			if err != nil {
-				fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
-				reply.TransferKeysCompleted = false
-				return err
-			}
-		}
-	}
-	reply.TransferKeysCompleted = true
 	return nil
 }
 
@@ -430,10 +471,11 @@ func periodicallyStabilize() {
 	}
 }
 
-// this is called immediately after Stabilize() has completed and checks the local DICT3 for any Triplets that might
-// need to be deleted because they were just copied as part of TransferKeys().  Any keys found to belong to the predecessor are deleted
+// this is called immediately after Stabilize() has completed and checks the local DICT3 for
+// any Triplets that might need to be deleted because they were just copied as part of
+// a call to TransferKeys().  Any keys found to belong to the predecessor are deleted
 func deleteAnyTransferredKeys() error {
-	fmt.Println("Stabilize completed - Now checking if i need to delete any duplicate keys that may have been transferred")
+	fmt.Println("Stabilize completed - Now checking if I need to delete any duplicate keys that may have been transferred")
 
 	// ensure stabilize has completed and a predecessor exists, otherwise null pointer dereference
 	if chord.Predecessor.ChordID != nil {
