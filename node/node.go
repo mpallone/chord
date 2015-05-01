@@ -262,7 +262,7 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 
 	var err error
 	suc, err := t.chord.FindSuccessor(args.Id)
-	reply.ChordNodePtr = *suc
+	reply.ChordNodePtr = suc
 	if err != nil {
 		fmt.Println("FindSuccessor() RPC received an error when calling chord.FindSuccessor()")
 	}
@@ -273,7 +273,7 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 // "reply *interface{}" means that no reply is sent.
 func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 	fmt.Println("Notify wrapper called.")
-	t.chord.Notify(&args.ChordNodePtr)
+	t.chord.Notify(args.ChordNodePtr)
 	reply.Dummy = "Dummy Notify Response"
 	return nil
 }
@@ -281,7 +281,7 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 // Takes no arguments, but does send a reply.
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	fmt.Println("GetPredecessor() RPC called.")
-	reply.Predecessor = *t.chord.Predecessor
+	reply.Predecessor = t.chord.Predecessor
 	return nil
 }
 
@@ -328,14 +328,15 @@ func (t *Node) run(conf ServerConfiguration) {
 	fmt.Printf("Chord Node ID: %d\n", chord.GetChordID(t.conf.IpAddress+":"+t.conf.Port))
 
 	// bootstrap, first node with port number 7001 creates the ring, and the rest join
+	t.chord = chord.GimmeAChord(t.conf.IpAddress, t.conf.Port)
+	t.chord.StabilizeDuration = t.stabilizeDuration
 	if t.conf.Port == "7001" {
-		t.chord = chord.Create(t.conf.IpAddress, t.conf.Port)
+		t.chord.Create()
 		fmt.Println("Finger Table: ", t.chord.FingerTable)
 	} else {
 		// contact CreatedNode and pass in my own chord ID
-		t.chord = chord.Join("127.0.0.1", "7001", t.conf.IpAddress, t.conf.Port)
+		t.chord.Join("127.0.0.1", "7001")
 	}
-	t.chord.StabilizeDuration = t.stabilizeDuration
 	fmt.Printf("Listening on port " + t.conf.Port + " ...\n")
 
 	go t.periodicallyStabilize()

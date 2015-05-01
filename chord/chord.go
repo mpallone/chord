@@ -18,7 +18,7 @@ type ChordNodePtr struct {
 }
 
 type FindSuccessorReply struct {
-	ChordNodePtr ChordNodePtr
+	ChordNodePtr *ChordNodePtr
 }
 
 type ChordIDArgs struct {
@@ -26,11 +26,11 @@ type ChordIDArgs struct {
 }
 
 type NotifyArgs struct {
-	ChordNodePtr ChordNodePtr
+	ChordNodePtr *ChordNodePtr
 }
 
 type GetPredecessorReply struct {
-	Predecessor ChordNodePtr
+	Predecessor *ChordNodePtr
 }
 
 // Notify doesn't send a reply, but I think the Go library
@@ -140,7 +140,7 @@ func GetChordID(str string) *big.Int {
 	return chordID
 }
 
-func gimmeAChord(ip string, port string) *Chord {
+func GimmeAChord(ip string, port string) *Chord {
 	t := new(Chord)
 	t.connections = make(map[string]*rpc.Client)
 
@@ -148,47 +148,33 @@ func gimmeAChord(ip string, port string) *Chord {
 	t.FingerTable[SELF].IpAddress = ip
 	t.FingerTable[SELF].Port = port
 	t.FingerTable[SELF].ChordID = GetChordID(ip + ":" + port)
-	t.Predecessor = t.FingerTable[SELF]
 	return t
 }
-func Create(ip string, port string) *Chord {
-	t := gimmeAChord(ip, port)
-
+func (t *Chord) Create() {
 	// first entry in finger table is set to itself
 	// first node is its own successor since no other nodes yet in the ring
-	// Init the pointer to ourself. Assume we own all pointers until we find otherwise. (fixes infinite loop between nodes)
 	t.FingerTable[1] = new(ChordNodePtr)
-	t.FingerTable[1].IpAddress = ip
-	t.FingerTable[1].Port = port
-	t.FingerTable[1].ChordID = GetChordID(ip + ":" + port)
+	*t.FingerTable[1] = *t.FingerTable[SELF]
 	fmt.Println("Creating chord ring and initializing finger table...")
-	return t
 }
 
 // parameters ip and port passed in is the existing node's ip address and port
-func Join(existingNodeIP string, existingNodePort string, myIp string, myPort string) *Chord {
-	t := gimmeAChord(existingNodeIP, existingNodePort)
-
+func (t *Chord) Join(existingNodeIP string, existingNodePort string) {
 	fmt.Println("Joining chord ring...")
 	fmt.Println("Making RPC call to: ", existingNodeIP, ":", existingNodePort)
 
-	// Init the pointer to ourself. Assume we own all pointers until we find otherwise. (fixes infinite loop between nodes)
-	t.FingerTable[SELF].IpAddress = myIp
-	t.FingerTable[SELF].Port = myPort
-	t.FingerTable[SELF].ChordID = GetChordID(myIp + ":" + myPort)
+	var existingNodePtr ChordNodePtr
+	existingNodePtr.IpAddress = existingNodeIP
+	existingNodePtr.Port = existingNodePort
+	existingNodePtr.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
 
-	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
 	args.Id = t.FingerTable[SELF].ChordID
 
-	var chordNodePtrToExistingNode ChordNodePtr
-	chordNodePtrToExistingNode.IpAddress = existingNodeIP
-	chordNodePtrToExistingNode.Port = existingNodePort
-	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
-
-	for t.CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
+	var findSuccessorReply FindSuccessorReply
+	for t.CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &existingNodePtr) != nil {
 		fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
-		time.Sleep(3 * t.StabilizeDuration / 2)
+		time.Sleep(t.StabilizeDuration)
 	}
 
 	// Set our fingers to point to the successor.
@@ -196,12 +182,9 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	//        but I don't feel like implementing that right now, and stabilize() and
 	//        fix_fingers() should result in correct finger tables eventually.
 	t.FingerTable[1] = new(ChordNodePtr)
-	t.FingerTable[1].IpAddress = findSuccessorReply.ChordNodePtr.IpAddress
-	t.FingerTable[1].Port = findSuccessorReply.ChordNodePtr.Port
-	t.FingerTable[1].ChordID = findSuccessorReply.ChordNodePtr.ChordID
+	*t.FingerTable[1] = *findSuccessorReply.ChordNodePtr
 
 	fmt.Println("Finger table at the end of Join():", t.FingerTable)
-	return t
 }
 
 // This is a generic way to call an RPC that hides the details of maintaining
@@ -217,9 +200,8 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 // chordNodePtr: the node to contact
 //
 func (t *Chord) CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
-
 	fmt.Println("-------------------------------------------------------")
-	fmt.Println("CallRPC() has been called with the following arguments:")
+	fmt.Println(t.FingerTable[SELF], ": CallRPC() has been called with the following arguments:")
 	fmt.Println("rpcString:", rpcString)
 	fmt.Println("args:", args)
 	fmt.Println("reply:", reply)
@@ -282,12 +264,11 @@ func (t *Chord) CallRPC(rpcString string, args interface{}, reply interface{}, c
 // ChordNodePtr is one we should maintain a persistent connection
 // with.
 func (t *Chord) isFingerOrPredecessor(chordNodePtr *ChordNodePtr) bool {
-	if ChordNodePtrsAreEqual(t.Predecessor, chordNodePtr) {
+	if t.Predecessor != nil && chordNodePtr != nil && ChordNodePtrsAreEqual(t.Predecessor, chordNodePtr) {
 		return true
 	}
 
 	for i := mBits; i >= 1; i-- {
-
 		if t.FingerTable[i] != nil {
 			if ChordNodePtrsAreEqual(t.FingerTable[i], chordNodePtr) {
 				return true
@@ -307,11 +288,8 @@ func (t *Chord) aFingerOrPredecessorIsNil() bool {
 	}
 
 	for i := mBits; i >= 1; i-- {
-
-		if t.FingerTable[i] != nil {
-			if t.FingerTable[i] == nil {
-				return true
-			}
+		if t.FingerTable[i] == nil {
+			return true
 		}
 	}
 	return false
@@ -320,6 +298,9 @@ func (t *Chord) aFingerOrPredecessorIsNil() bool {
 // Returns True if two *ChordNodePtr's are the same. This could probably
 // just use the Chord ID, but screw big.Int
 func ChordNodePtrsAreEqual(ptr1 *ChordNodePtr, ptr2 *ChordNodePtr) bool {
+	if ptr1 == nil || ptr2 == nil {
+		return false
+	}
 	if ptr1.IpAddress != ptr2.IpAddress {
 		return false
 	}
@@ -335,24 +316,19 @@ func (t *Chord) FindSuccessor(id *big.Int) (*ChordNodePtr, error) {
 
 	if id == nil {
 		fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
-		time.Sleep(5 * t.StabilizeDuration)
+		time.Sleep(t.StabilizeDuration)
 		return &ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
-	for i := 1; i <= mBits && t.FingerTable[i] != nil; i++{
-		if Inclusive_in(id, addOne(t.FingerTable[i - 1].ChordID), t.FingerTable[i].ChordID) {
-			return t.FingerTable[i], nil
+	if t.FingerTable[1] != nil{
+		if Inclusive_in(id, addOne(t.FingerTable[SELF].ChordID), t.FingerTable[1].ChordID) {
+			return t.FingerTable[1], nil
 		}
 	}
 
 	closestPrecedingFinger := t.closestPrecedingNode(id)
-
-	// TODO If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
-	// at the top of this function didn't work, and also that our finger table isn't yet correct. So,
-	// ask our successor to find the node for us in this case.
-	if closestPrecedingFinger == t.FingerTable[SELF] {
-		fmt.Println("FINDSUCCESSOR!! THIS SHOULD NEVER HAPPEN!!! DELETE ME??")
-		return t.FingerTable[SELF], nil
+	if closestPrecedingFinger == t.FingerTable[0] || closestPrecedingFinger == nil{
+		return t.FingerTable[0], nil
 	}
 
 	fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
@@ -366,18 +342,23 @@ func (t *Chord) FindSuccessor(id *big.Int) (*ChordNodePtr, error) {
 		fmt.Println("CallRPC() returned the following error:", err)
 	}
 
-	return &findSuccessorReply.ChordNodePtr, nil
+	return findSuccessorReply.ChordNodePtr, nil
 }
 
 func (t *Chord) closestPrecedingNode(id *big.Int) *ChordNodePtr {
+	//	for i := 1; i <= mBits && t.FingerTable[i] != nil; i++{
+	//		if Inclusive_in(id, addOne(t.FingerTable[i - 1].ChordID), t.FingerTable[i].ChordID) {
+	//			return t.FingerTable[i]
+	//		}
+	//	}
 
+	//	return nil
 	for i := mBits; i >= 1; i-- {
-
 		if t.FingerTable[i] != nil {
 			myId := t.FingerTable[SELF].ChordID
 			currentFingerId := t.FingerTable[i].ChordID
 
-			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) && currentFingerId != myId {
+			if Inclusive_in(currentFingerId, addOne(myId), subOne(id)) {
 				return t.FingerTable[i]
 			}
 		}
@@ -385,10 +366,12 @@ func (t *Chord) closestPrecedingNode(id *big.Int) *ChordNodePtr {
 	return nil
 }
 
+
 // nodePtr thinks it might be our successor
 func (t *Chord) Notify(nodePtr *ChordNodePtr) {
+	fmt.Println(nodePtr.ChordID, "NOTIFIED", t.FingerTable[0].ChordID)
 	// Need to be careful not to dereference Predecessor, if it's a null pointer.
-	if t.Predecessor.ChordID == nil {
+	if t.Predecessor == nil {
 		t.Predecessor = nodePtr
 	} else if Inclusive_in(nodePtr.ChordID, addOne(t.Predecessor.ChordID), subOne(t.FingerTable[SELF].ChordID)) {
 		t.Predecessor = nodePtr
@@ -402,18 +385,20 @@ func (t *Chord) Stabilize() {
 	var getPredecessorReply GetPredecessorReply
 	var args interface{}
 
-	t.CallRPC("Node.GetPredecessor", &args, &getPredecessorReply, t.FingerTable[1])
+	if t.CallRPC("Node.GetPredecessor", &args, &getPredecessorReply, t.FingerTable[1]) != nil {
+		return
+	}
 
-	successorsPredecessor := &getPredecessorReply.Predecessor
+	successorsPredecessor := getPredecessorReply.Predecessor
 
-	if successorsPredecessor != nil && successorsPredecessor != t.FingerTable[SELF]{
+	if successorsPredecessor != nil {
 		if Inclusive_in(successorsPredecessor.ChordID, addOne(t.FingerTable[SELF].ChordID), subOne(t.FingerTable[1].ChordID)) {
 			t.FingerTable[1] = successorsPredecessor
 		}
 	}
 
 	var notifyArgs NotifyArgs
-	notifyArgs.ChordNodePtr = *t.FingerTable[SELF]
+	notifyArgs.ChordNodePtr = t.FingerTable[SELF]
 	var reply NotifyReply
 
 	t.CallRPC("Node.Notify", &notifyArgs, &reply, t.FingerTable[1])
@@ -441,17 +426,14 @@ func (t *Chord) FixFingers() {
 			return
 		}
 		fmt.Println("result:", *successor)
-
-		if successor != t.FingerTable[SELF]{
-			t.FingerTable[next] = successor
-		}
+		t.FingerTable[next] = successor
 
 		fmt.Print("\nFixFingers():[")
 		for i := 0; i < mBits+1; i++ {
 			if t.FingerTable[i] == nil {
 				fmt.Print("nil, ")
 			} else {
-				fmt.Print(*t.FingerTable[i], ", ")
+				fmt.Print(*t.FingerTable[i], " ")
 			}
 		}
 		fmt.Println("]")

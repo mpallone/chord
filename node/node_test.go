@@ -11,10 +11,10 @@ import (
 
 func TestKeyLocation(t *testing.T) {
 	//const numNodes = 20 //TODO: 21 nodes = collision
-	const numNodes = 2 //TODO: 21 nodes = collision
-	const numEntries = 16
+	const numNodes = 3 //TODO: 21 nodes = collision
+	const numEntries = 512
 	const fingerTableSize = 9
-	const duration = 1000 * time.Millisecond
+	const duration = 100 * time.Millisecond
 
 	//Make some test data
 	entries := make([]Args, numEntries)
@@ -35,7 +35,7 @@ func TestKeyLocation(t *testing.T) {
 
 	//Make some nodes
 	nodes := make([]*Node, numNodes)
-	for i := 0; i < numNodes; i++ {
+	for i := numNodes - 1; i >= 0; i-- {
 		var conf ServerConfiguration
 		conf.Protocol = "tcp"
 		conf.IpAddress = "127.0.0.1"
@@ -49,24 +49,26 @@ func TestKeyLocation(t *testing.T) {
 		n.stabilizeDuration = duration
 		nodes[i] = n
 		go n.run(conf)
+		for n.chord == nil {
+			time.Sleep(duration)
+		}
+		time.Sleep(123 * time.Millisecond)
 	}
+	time.Sleep(10 * (fingerTableSize) * duration)
+return
 
 	//Wait for a stable network
 	stable := false
 	lastState := make([][]*chord.ChordNodePtr, numNodes)
 	for i := 0; i < numNodes; i++ {
 		lastState[i] = make([]*chord.ChordNodePtr, fingerTableSize)
-		for nodes[i].chord == nil {
-			fmt.Print("")
-		}
-		for len(nodes[i].chord.FingerTable) == 0 {
-			fmt.Print("")
-		}
 		for j := 0; j < fingerTableSize; j++ {
-			if nodes[i].chord.FingerTable[j] != nil {
-				cnp := *nodes[i].chord.FingerTable[j]
-				lastState[i][j] = &cnp
+			if nodes[i].chord.FingerTable[j] == nil{
+				j--
+				continue
 			}
+			lastState[i][j] = new(chord.ChordNodePtr)
+			*lastState[i][j] = *nodes[i].chord.FingerTable[j]
 		}
 	}
 	fmt.Println("node_test.go: Stabilizing...")
@@ -75,16 +77,13 @@ func TestKeyLocation(t *testing.T) {
 		stable = true
 		for i := 0; i < numNodes; i++ {
 			for j := 0; j < fingerTableSize; j++ {
-				if lastState[i][j] == nil || *lastState[i][j] != *nodes[i].chord.FingerTable[j]{
+				if *lastState[i][j] != *nodes[i].chord.FingerTable[j] {
 					stable = false
 					break
 				}
 			}
 			for j := 0; j < fingerTableSize; j++ {
-				if nodes[i].chord.FingerTable[j] != nil {
-					cnp := *nodes[i].chord.FingerTable[j]
-					lastState[i][j] = &cnp
-				}
+				*lastState[i][j] = *nodes[i].chord.FingerTable[j]
 			}
 		}
 	}
