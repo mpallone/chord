@@ -60,6 +60,18 @@ type TransferKeysReply struct {
 type DeleteTransferredKeysReply struct {
 	TransferKeysDeleted bool
 }
+type SetPredecessorArgs struct {
+	ChordNodePtr ChordNodePtr
+}
+type SetPredecessorReply struct {
+	PredecessorSet bool
+}
+type SetSucessorArgs struct {
+	ChordNodePtr ChordNodePtr
+}
+type SetSuccessorReply struct {
+	SuccessorSet bool
+}
 
 // Implements the set membership test used by
 //

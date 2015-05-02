@@ -251,7 +251,48 @@ func (t *Node) ListIDs(args *Args, reply *ListIDsReply) error {
 // SHUTDOWN()
 func (t *Node) Shutdown(args *Args, reply *string) error {
 
-	fmt.Println("  Shutting down ... ")
+	fmt.Println("***Preparing to shut down. Transferring my keys to my successor...")
+
+	var numKeysTransferred int = 0
+	for kr, v := range dict {
+
+		var argXferInsert Args
+		var xferInsertreply InsertReply
+		argXferInsert.Key = kr.Key
+		argXferInsert.Rel = kr.Rel
+		argXferInsert.Val = v
+
+		err := chord.CallRPC("Node.TransferInsert", &argXferInsert, &xferInsertreply, &chord.FingerTable[1])
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		numKeysTransferred++
+	}
+	fmt.Printf("***Triplets transferred: %d\n", numKeysTransferred)
+
+	fmt.Printf("***Updating my successor's predecessor (currently me, Node %d) to now point to my predecessor (Node %d)\n", chord.FingerTable[0].ChordID, chord.Predecessor.ChordID)
+	var argsSetPredecessor chord.SetPredecessorArgs
+	var setPredecessorReply chord.SetPredecessorReply
+	argsSetPredecessor.ChordNodePtr = chord.Predecessor
+
+	err := chord.CallRPC("Node.SetPredecessor", &argsSetPredecessor, &setPredecessorReply, &chord.FingerTable[1])
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("***Updating my predecessor (Node %d) to now point to my successor (Node %d) \n", chord.Predecessor.ChordID, chord.FingerTable[1].ChordID)
+	var argsSetSuccessor chord.SetSucessorArgs
+	var setSuccessorReply chord.SetSuccessorReply
+	argsSetSuccessor.ChordNodePtr = chord.FingerTable[1]
+
+	err = chord.CallRPC("Node.SetSuccessor", &argsSetSuccessor, &setSuccessorReply, &chord.Predecessor)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
 	os.Exit(0)
 	return nil
 }
@@ -380,6 +421,30 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	//fmt.Println("GetPredecessor() RPC called.")
 	reply.Predecessor = chord.Predecessor
+	return nil
+}
+
+// argument is a ChordNodePtr (the new predecessor)
+func (t *Node) SetPredecessor(args *chord.SetPredecessorArgs, reply *chord.SetPredecessorReply) error {
+	fmt.Printf("SetPredecessor() called, setting predecessor to: %d\n", args.ChordNodePtr.ChordID)
+
+	chord.Predecessor.IpAddress = args.ChordNodePtr.IpAddress
+	chord.Predecessor.Port = args.ChordNodePtr.Port
+	chord.Predecessor.ChordID = args.ChordNodePtr.ChordID
+
+	fmt.Printf("My Predecessor is now: %v\n", chord.Predecessor)
+	return nil
+}
+
+// argument is a ChordNodePtr (the new successor)
+func (t *Node) SetSuccessor(args *chord.SetSucessorArgs, reply *chord.SetSuccessorReply) error {
+	fmt.Printf("SetSuccessor() called, setting successor to: %d\n", args.ChordNodePtr.ChordID)
+
+	chord.FingerTable[1].IpAddress = args.ChordNodePtr.IpAddress
+	chord.FingerTable[1].Port = args.ChordNodePtr.Port
+	chord.FingerTable[1].ChordID = args.ChordNodePtr.ChordID
+
+	fmt.Printf("My Successor is now: %v\n", chord.FingerTable[1])
 	return nil
 }
 
