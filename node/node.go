@@ -17,6 +17,7 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -668,7 +669,7 @@ func checkErrorCondition(err error) {
 
 func (t *Node) sigHandler() {
 	c := make(chan os.Signal)
-	signal.Notify(c)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGKILL)
 	<-c
 	t.Shutdown(nil, nil)
 }
