@@ -19,6 +19,18 @@ import (
 	"time"
 )
 
+type keyRelValue struct {
+	Content    interface{}
+	Size       string
+	Created    string
+	Modified   string
+	Accessed   string
+	Permission string
+}
+
+// layout shows by example how the reference time should be represented.
+const longForm = "1/_2/2006, 15:04:05"
+
 // server configuration object read in
 var conf ServerConfiguration
 
@@ -46,13 +58,13 @@ type KeyRelPair struct {
 type Args struct {
 	Key TripKey
 	Rel TripRel
-	Val TripVal // only used for insert and insertOrUpdate,
+	Val keyRelValue // only used for insert and insertOrUpdate,
 }
 
 type LookupReply struct {
 	Key TripKey
 	Rel TripRel
-	Val TripVal
+	Val keyRelValue
 }
 type InsertReply struct {
 	TripletInserted bool
@@ -68,7 +80,7 @@ type DeleteReply struct {
 }
 
 // global variable
-var dict = map[KeyRelPair]TripVal{}
+var dict = map[KeyRelPair]keyRelValue{}
 
 // LOOKUP(keyA, relationA)
 func (t *Node) Lookup(args *Args, reply *LookupReply) error {
@@ -112,11 +124,10 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 	//else insert the args here
 	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
 
-		//Connect to the successor node of KeyRelID
-
 		//Copy reply
 		newReply := reply
 
+		//Make an RPC Insert call on the keyRelID's successor
 		err = chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
@@ -183,14 +194,13 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 
 	//Check if the current node is the successor of keyRelID
 	//if not then make a RPC Delete call on the keyRelID's successor
-	//else insert the args here
+	//else delete the args here
 	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
-
-		//Connect to the successor node of KeyRelID
 
 		//Copy reply
 		newReply := reply
 
+		//Make an RPC Delete call on the KeyRelID's successor
 		err = chord.CallRPC("Node.Delete", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Delete RPC failed to call the remote node's Delete with error:", err)
@@ -201,17 +211,43 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 
 	} else {
 
-		//Print insert message
-		fmt.Print("  Deleting:      ", args.Key, ", ", args.Rel, ", ", args.Val)
-
 		// construct temp KeyRelPair
 		krp := KeyRelPair{args.Key, args.Rel}
-		delete(dict, krp)
-		fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
-		writeDictToDisk()
-		reply.TripletDeleted = true
-	}
 
+		//Print delete message
+		fmt.Println("  Deleting:      ", krp, ", ", args.Val)
+
+		//Check if the content is Read only
+		fmt.Println(len(dict))
+		for krp := range dict {
+			val := dict[krp]			
+			if p := val.Permission; p == "R" {
+				//Read only: can not delete
+			} else if p := val.Permission; p == "RW" {
+				//Can delete if the file access time is less than the user pecified time
+				a := val.Accessed
+				t1, err := time.Parse(longForm, a)
+				if err != nil {
+					fmt.Println("Time format is wrong", err)
+					return err
+				}
+				//TODO: This should be a user specified time loaded from the config file
+				//Right now it is hard coded
+				t2, err := time.Parse(longForm, "3/10/2015, 18:09:54")
+
+				//Check if the accessed time is after the user specified time
+				if t1.After(t2) {
+					delete(dict, krp)
+					fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
+					writeDictToDisk()
+					reply.TripletDeleted = true
+				}
+			} else {
+				//invalid permission
+				//do nothing
+			}
+		}
+	}
 	return nil
 }
 
