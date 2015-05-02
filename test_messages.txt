@@ -1,13 +1,8 @@
-{"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}
+
 {"method":"Node.Insert","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyC", "Rel":"relC", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyD", "Rel":"relD", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyE", "Rel":"relE", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyF", "Rel":"relF", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyG", "Rel":"relG", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyH", "Rel":"relH", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyI", "Rel":"relI", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyJ", "Rel":"relJ", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyK", "Rel":"relK", "Val":{"a":5, "b":6} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyL", "Rel":"relL", "Val":{"a":5, "b":6} }], "id":85}
+
+{"method":"Node.Insert","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"content": "anyvalidJSONstring","size": "1KB", "created": "3/18/2015, 8:50:26","modified": "3/20/2015, 16: 40: 03","accessed": "3/20/2015, 18:09:54","permission": "RW"}}], "id":85}
+
+{"method":"Node.Delete","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"content": "anyvalidJSONstring","size": "1KB", "created": "3/18/2015, 8:50:26","modified": "3/20/2015, 16: 40: 03","accessed": "3/20/2015, 18:09:54","permission": "RW"}}], "id":85}
+
 
