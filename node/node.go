@@ -17,6 +17,8 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"time"
+	"bytes"
+	"strconv"
 )
 
 type keyRelValue struct {
@@ -145,6 +147,23 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		// construct temp KeyRelPair
 		krp := KeyRelPair{args.Key, args.Rel}
 
+		//Calculate content size:
+		size, err := GetBytes(args.Val.Content)
+		if err != nil {
+			fmt.Println("Time format is wrong", err)
+			return err
+		}
+		ContentSize := strconv.Itoa(len(size)) + "bytes"
+		
+		//Se the content size
+		args.Val.Size = ContentSize
+		
+		//Get the current system date and time
+		created := time.Now().Format(longForm)
+		
+		//Set the created date
+		args.Val.Created = created
+
 		// add key-rel pair if does not exist in dict
 		if _, exists := dict[krp]; !exists {
 			dict[krp] = args.Val
@@ -234,6 +253,10 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 				//TODO: This should be a user specified time loaded from the config file
 				//Right now it is hard coded
 				t2, err := time.Parse(longForm, "3/10/2015, 18:09:54")
+				if err != nil {
+					fmt.Println("Time format is wrong", err)
+					return err
+				}
 
 				//Check if the accessed time is after the user specified time
 				if t1.After(t2) {
@@ -444,4 +467,14 @@ func checkErrorCondition(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func GetBytes(key interface{}) ([]byte, error) {
+    var buf bytes.Buffer
+    enc := gob.NewEncoder(&buf)
+    err := enc.Encode(key)
+    if err != nil {
+        return nil, err
+    }
+    return buf.Bytes(), nil
 }
