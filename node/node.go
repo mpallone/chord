@@ -305,6 +305,10 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 		numKeysTransferred++
 	}
 	fmt.Printf("***Triplets transferred: %d\n", numKeysTransferred)
+
+	fmt.Println("***Closing persistent connections.")
+	chord.ClosePersistentConnections()
+
 	shutdownDone = true
 	return nil
 }

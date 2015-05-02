@@ -76,6 +76,12 @@ type SetSuccessorReply struct {
 	SuccessorSet bool
 }
 
+func ClosePersistentConnections() {
+	for key, _ := range connections {
+		connections[key].Close()
+	}
+}
+
 // Implements the set membership test used by
 //
 //     find_successor()
