@@ -16,11 +16,16 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"os/signal"
 	"time"
 )
 
 // server configuration object read in
 var conf ServerConfiguration
+var stabilizeDone = false
+var runListener = true
+var listenerDone = false
+var shutdownDone = false
 
 type ServerConfiguration struct {
 	ServerID                   string
@@ -253,23 +258,12 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 
 	fmt.Println("***Preparing to shut down. Transferring my keys to my successor...")
 
-	var numKeysTransferred int = 0
-	for kr, v := range dict {
-
-		var argXferInsert Args
-		var xferInsertreply InsertReply
-		argXferInsert.Key = kr.Key
-		argXferInsert.Rel = kr.Rel
-		argXferInsert.Val = v
-
-		err := chord.CallRPC("Node.TransferInsert", &argXferInsert, &xferInsertreply, &chord.FingerTable[1])
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-		numKeysTransferred++
+	//Leave the network and update the others
+	chord.RunStabilize = false
+	runListener = false
+	for !chord.FFDone || !stabilizeDone || !listenerDone {
+		time.Sleep(time.Millisecond)
 	}
-	fmt.Printf("***Triplets transferred: %d\n", numKeysTransferred)
 
 	fmt.Printf("***Updating my successor's predecessor (currently me, Node %d) to now point to my predecessor (Node %d)\n", chord.FingerTable[0].ChordID, chord.Predecessor.ChordID)
 	var argsSetPredecessor chord.SetPredecessorArgs
@@ -293,7 +287,24 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 		return err
 	}
 
-	os.Exit(0)
+	var numKeysTransferred int = 0
+	for kr, v := range dict {
+
+		var argXferInsert Args
+		var xferInsertreply InsertReply
+		argXferInsert.Key = kr.Key
+		argXferInsert.Rel = kr.Rel
+		argXferInsert.Val = v
+
+		err := chord.CallRPC("Node.TransferInsert", &argXferInsert, &xferInsertreply, &chord.FingerTable[1])
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		numKeysTransferred++
+	}
+	fmt.Printf("***Triplets transferred: %d\n", numKeysTransferred)
+	shutdownDone = true
 	return nil
 }
 
@@ -472,7 +483,8 @@ func main() {
 	checkErrorCondition(err)
 
 	// register procedure call
-	rpc.Register(new(Node))
+	n := new(Node)
+	rpc.Register(n)
 
 	listener, err := net.ListenTCP(conf.Protocol, tcpAddr)
 	checkErrorCondition(err)
@@ -503,14 +515,19 @@ func main() {
 
 	go periodicallyStabilize()
 	go chord.FixFingers()
+	go n.sigHandler()
 
-	for {
+	for runListener {
+		listener.SetDeadline(time.Now().Add(time.Second))
 		conn, err := listener.Accept()
 		if err != nil {
 			continue
 		}
 		go jsonrpc.ServeConn(conn)
-
+	}
+	listenerDone = true
+	for !shutdownDone {
+		time.Sleep(time.Millisecond)
 	}
 }
 func join(existingNodeIpAddress string, existingNodePort string) {
@@ -525,15 +542,17 @@ func join(existingNodeIpAddress string, existingNodePort string) {
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("2s")
-	for {
+	for chord.RunStabilize {
 		time.Sleep(duration)
 		chord.Stabilize()
 		deleteAnyTransferredKeys()
 
 		//fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
 		//fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
+
 		//fmt.Println("periodicallyStabilize(), successor:", chord.FingerTable[1])
 	}
+	stabilizeDone = true
 }
 
 // this is called immediately after Stabilize() has completed and checks the local DICT3 for
@@ -645,4 +664,11 @@ func checkErrorCondition(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (t *Node) sigHandler() {
+	c := make(chan os.Signal)
+	signal.Notify(c)
+	<-c
+	t.Shutdown(nil, nil)
 }

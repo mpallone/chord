@@ -29,7 +29,7 @@ for c in $configs; do
             node $c &>/dev/null&
             ;;
         tmux)
-            tmux new-window -n $c "node $c; cat -"
+            tmux new-window -n $c "${GOPATH}/bin/node $c; cat -"
             ;;
         gnome-terminal)
 	        gnome-terminal  -e "${GOPATH}/bin/node $c" --window-with-profile=HOLD_OPEN --title="$c"
