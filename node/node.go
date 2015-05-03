@@ -108,21 +108,45 @@ func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
 // LOOKUP(keyA, relationA)
 func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
-	fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
+    fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
-	// construct temp KeyRelPair
-	krp := KeyRelPair{args.Key, args.Rel}
+    // Remove any leading or trailing whitespace: 
+    dict3key = strings.TrimSpace(args.Key)
+    dict3rel = strings.TrimSpace(args.Rel)
 
-	// return triplet Value if KeyRelPair exists
-	if tempVal, exists := dict[krp]; exists {
-		reply.Key = args.Key
-		reply.Rel = args.Rel
-		reply.Val = tempVal
-		fmt.Println(" ... Triplet found in DICT3.")
-	} else {
-		fmt.Println(" ... Triplet NOT found in DICT3.")
-	}
-	return nil
+    fmt.Println(" @@@ stripped dict3key:", dict3key)
+    fmt.Println(" @@@ stripped dict3rel:", dict3rel)
+
+    if len(dict3key) != 0 && len(dict3rel) != 0 {
+
+        fmt.Println(" *** Performing a 'normal' lookup on ", dict3key, dict3rel)
+
+    } else if len(dict3key) != 0 && len(dict3rel) == 0 {
+
+        fmt.Println(" *** Performing a key-only partial match on ", dict3key)
+
+    } else if len(dict3key) == 0 && len(dict3rel) != 0 {
+
+        fmt.Println(" *** Performing a rel-only partial match on ", dict3rel)
+
+    } else {
+
+        fmt.Println(" *** Lookup RPC called with invalid args:", args)
+    }
+
+    // // construct temp KeyRelPair
+    // krp := KeyRelPair{args.Key, args.Rel}
+
+    // // return triplet Value if KeyRelPair exists
+    // if tempVal, exists := dict[krp]; exists {
+    //  reply.Key = args.Key
+    //  reply.Rel = args.Rel
+    //  reply.Val = tempVal
+    //  fmt.Println(" ... Triplet found in DICT3.")
+    // } else {
+    //  fmt.Println(" ... Triplet NOT found in DICT3.")
+    // }
+    // return nil
 }
 
 // INSERT(keyA, relationA, valA)
