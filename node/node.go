@@ -20,6 +20,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"strings"
 )
 
 // server configuration object read in
