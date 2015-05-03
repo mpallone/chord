@@ -45,6 +45,7 @@ type ServerConfiguration struct {
 		File string
 	}
 	Methods []string
+	Purge string
 }
 
 type Node int
@@ -155,7 +156,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		}
 		ContentSize := strconv.Itoa(len(size)) + "bytes"
 		
-		//Se the content size
+		//Set the content size
 		args.Val.Size = ContentSize
 		
 		//Get the current system date and time
@@ -182,15 +183,67 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 // INSERTORUPDATE(keyA, relA, valA)
 func (t *Node) InsertOrUpdate(args *Args, reply *string) error {
 
-	fmt.Print("  InsOrUpd: ", args.Key, ", ", args.Rel, ", ", args.Val)
+	//create the key and relationship concatenated ID
+	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 
-	//construct temp KeyRelPair
-	krp := KeyRelPair{args.Key, args.Rel}
-	dict[krp] = args.Val
+	//Find the successor of the KeyRelID
+	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
+	if err != nil {
+		fmt.Println("ERROR: Insert() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
+		return err
+	}
 
-	fmt.Println(" ... Writing new (or updated) triplet to disk.")
-	writeDictToDisk()
+	//Check if the current node is the successor of keyRelID
+	//if not then make a RPC Insert call on the keyRelID's successor
+	//else insert the args here
+	if keyRelSuccessor.ChordID.Cmp(chord.FingerTable[0].ChordID) != 0 {
 
+		//Copy reply
+		newReply := reply
+
+		//Make an RPC Insert call on the keyRelID's successor
+		err = chord.CallRPC("Node.InsertOrUpdate", &args, &newReply, &keyRelSuccessor)
+		if err != nil {
+			fmt.Println("node.go's Insert RPC failed to call the remote node's InsertOrUpdate with error:", err)
+			return err
+		}
+	} else {
+		fmt.Print("  InsOrUpdate: ", args.Key, ", ", args.Rel, ", ", args.Val)
+	
+		// construct temp KeyRelPair
+		krp := KeyRelPair{args.Key, args.Rel}
+
+		//Calculate content size:
+		size, err := GetBytes(args.Val.Content)
+		if err != nil {
+			fmt.Println("Time format is wrong", err)
+			return err
+		}
+		ContentSize := strconv.Itoa(len(size)) + "bytes"
+		
+		//Set the content size
+		args.Val.Size = ContentSize
+		
+		//Get the current system date and time
+		created := time.Now().Format(longForm)
+		modified := time.Now().Format(longForm)
+		
+		// add key-rel pair if does not exist in dict
+		if _, exists := dict[krp]; !exists {
+			//Set the created date
+			args.Val.Created = created
+			dict[krp] = args.Val
+			fmt.Println(" ... Writing new (or updated) triplet to disk.")
+			writeDictToDisk()
+		}else{//update
+			//Set the modified date
+			args.Val.Modified = modified
+			dict[krp] = args.Val
+			fmt.Println(" ... Writing new (or updated) triplet to disk.")
+			writeDictToDisk()
+		}
+		}
 	return nil
 }
 
@@ -243,31 +296,14 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 			if p := val.Permission; p == "R" {
 				//Read only: can not delete
 			} else if p := val.Permission; p == "RW" {
-				//Can delete if the file access time is less than the user pecified time
-				a := val.Accessed
-				t1, err := time.Parse(longForm, a)
-				if err != nil {
-					fmt.Println("Time format is wrong", err)
-					return err
-				}
-				//TODO: This should be a user specified time loaded from the config file
-				//Right now it is hard coded
-				t2, err := time.Parse(longForm, "3/10/2015, 18:09:54")
-				if err != nil {
-					fmt.Println("Time format is wrong", err)
-					return err
-				}
-
-				//Check if the accessed time is after the user specified time
-				if t1.After(t2) {
-					delete(dict, krp)
-					fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
-					writeDictToDisk()
-					reply.TripletDeleted = true
-				}
+				delete(dict, krp)
+				fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
+				writeDictToDisk()
+				reply.TripletDeleted = true
 			} else {
 				//invalid permission
 				//do nothing
+				reply.TripletDeleted = false
 			}
 		}
 	}
@@ -393,6 +429,7 @@ func main() {
 
 	go periodicallyStabilize()
 	go chord.FixFingers()
+	go purge()
 
 	for {
 		conn, err := listener.Accept()
@@ -402,6 +439,42 @@ func main() {
 		go jsonrpc.ServeConn(conn)
 
 	}
+}
+
+func purge() {
+	duration, _ := time.ParseDuration("300s")
+	for {
+		time.Sleep(duration)
+		
+		
+		
+		//Get purge time from configuration file
+		purge_time := conf.Purge
+		
+		fmt.Println("Purge called. Checking if entries have been accessed since: ", purge_time)
+		
+		for krp, val := range dict {
+		accessed_time := val.Accessed
+		accessTime, err := time.Parse(longForm, accessed_time)
+		if err != nil {
+			fmt.Println("Time format is wrong or access time is nil", err)
+		}
+		purgeTime, err := time.Parse(longForm, purge_time)
+		if err != nil {
+			fmt.Println("Time format is wrong", err)
+		}
+		
+		//If krp has not been accessed sonce some user specified time aka purge time then delete
+		if !accessTime.After(purgeTime){
+			if p := val.Permission; p == "R" {
+				delete(dict, krp)
+				fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
+				writeDictToDisk()
+			}
+			fmt.Println("Can't purge Read only")
+		}
+		}
+		}//loop forever
 }
 
 func periodicallyStabilize() {
@@ -443,6 +516,7 @@ func parseConfigurationFile(infile string) {
 	fmt.Println("   Port: ", conf.Port)
 	fmt.Println("   Persistent Storage Container: ", conf.PersistentStorageContainer.File)
 	fmt.Println("   Methods: ", conf.Methods)
+	fmt.Println("   Purge: ", conf.Purge)
 }
 
 func openPersistentStorageContainer(pathToStorageContainer string) {
