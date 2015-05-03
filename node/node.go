@@ -111,8 +111,8 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
     fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
     // Remove any leading or trailing whitespace: 
-    dict3key = strings.TrimSpace(args.Key)
-    dict3rel = strings.TrimSpace(args.Rel)
+    dict3key := strings.TrimSpace(args.Key)
+    dict3rel := strings.TrimSpace(args.Rel)
 
     fmt.Println(" @@@ stripped dict3key:", dict3key)
     fmt.Println(" @@@ stripped dict3rel:", dict3rel)
