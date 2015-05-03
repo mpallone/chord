@@ -17,12 +17,12 @@ type ChordNodePtr struct {
 	Port      string
 }
 
-const mBits int = 8
+const MBits int = 8 // This *must* be an even number for key/rel hashing purposes
 const SELF int = 0
 
 var Predecessor ChordNodePtr
 
-var FingerTable [mBits + 1]ChordNodePtr
+var FingerTable [MBits + 1]ChordNodePtr
 
 var connections = make(map[string]*rpc.Client)
 
@@ -119,10 +119,10 @@ func Inclusive_in(searchKey *big.Int, startKey *big.Int, stopKey *big.Int) bool 
 	return (greaterThanOrEqualToStartKey && lessThanOrEqualToMaxKey) || (greaterThanOrEqualToZero && lessThanOrEqualToStopKey)
 }
 
-// Uses mBits to compute and return 2**mbits - 1
+// Uses MBits to compute and return 2**Mbits - 1
 func ComputeMaxKey() *big.Int {
 	base := big.NewInt(2)
-	m := big.NewInt(int64(mBits))
+	m := big.NewInt(int64(MBits))
 
 	max_key := big.NewInt(0)
 	max_key.Exp(base, m, nil)
@@ -322,7 +322,7 @@ func isFingerOrPredecessor(chordNodePtr *ChordNodePtr) bool {
 		return true
 	}
 
-	for i := mBits; i >= 1; i-- {
+	for i := MBits; i >= 1; i-- {
 
 		if FingerTable[i].ChordID != nil {
 			if ChordNodePtrsAreEqual(&FingerTable[i], chordNodePtr) {
@@ -342,7 +342,7 @@ func aFingerOrPredecessorIsNil() bool {
 		return true
 	}
 
-	for i := mBits; i >= 1; i-- {
+	for i := MBits; i >= 1; i-- {
 
 		if FingerTable[i].ChordID != nil {
 			if &FingerTable[i] == nil {
@@ -405,7 +405,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
 func closestPrecedingNode(id *big.Int) ChordNodePtr {
 
-	for i := mBits; i >= 1; i-- {
+	for i := MBits; i >= 1; i-- {
 
 		if FingerTable[i].ChordID != nil {
 			myId := FingerTable[SELF].ChordID
@@ -460,14 +460,14 @@ func FixFingers() {
 	for RunStabilize {
 		time.Sleep(duration)
 		next += 1
-		if next > mBits {
+		if next > MBits {
 			next = 1
 		}
 
 		base := big.NewInt(2)
 		exponent := big.NewInt(int64(next - 1))
 		lookupKey := new(big.Int).Add(FingerTable[SELF].ChordID, new(big.Int).Exp(base, exponent, nil))
-		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(mBits)), nil))
+		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(MBits)), nil))
 
 		//fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
 		successor, err := FindSuccessor(lookupKey)

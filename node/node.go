@@ -12,6 +12,7 @@ import (
 	"github.com/robcs621/proj2/chord"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -76,6 +77,34 @@ type DeleteReply struct {
 // global variable
 var dict = map[KeyRelPair]TripVal{}
 
+// Hash the key and rel, concatenate the lower order bits together,
+// and return the result as a *big.Int.
+func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
+	tripletKeyHash := chord.GetChordID(tripletKey)
+	tripletRelHash := chord.GetChordID(tripletRel)
+	fmt.Println(" @@@   initial tripletKeyHash:", tripletKeyHash) // todo remove
+	fmt.Println(" @@@   initial tripletRelHash:", tripletRelHash) // todo remove
+
+	lowOrderBitMask := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(chord.MBits/2)), nil)
+	lowOrderBitMask = new(big.Int).Sub(lowOrderBitMask, big.NewInt(1))
+
+	fmt.Println(" @@@   getDict3ChordKey, lowOrderBitMask:", lowOrderBitMask) // todo remove
+
+	// Extract the low order bits from each hash
+	tripletKeyHash = new(big.Int).And(tripletKeyHash, lowOrderBitMask)
+	tripletRelHash = new(big.Int).And(tripletRelHash, lowOrderBitMask)
+
+	fmt.Println(" @@@   tripletKeyHash after applying mask:", tripletKeyHash) // todo remove
+	fmt.Println(" @@@   tripletRelHash after applying mask:", tripletRelHash) // todo remove
+
+	chordKey := new(big.Int).Lsh(tripletKeyHash, uint(chord.MBits/2))
+	chordKey = new(big.Int).Or(chordKey, tripletRelHash)
+
+	fmt.Println(" @@@   returning chordKey:", chordKey)
+
+	return chordKey
+}
+
 // LOOKUP(keyA, relationA)
 func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
@@ -103,6 +132,11 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 
 	//create the key and relationship concatenated ID
 	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+
+	/////////////// MCP testing //////////////
+	newChordId := getDict3ChordKey(string(args.Key), string(args.Rel))
+	fmt.Println(" @@@ newChordId:", newChordId)
+	//////////////////////////////////////////
 
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
