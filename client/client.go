@@ -52,6 +52,10 @@ func main() {
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
 	fmt.Println(`Example: {"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
 	fmt.Println(`{"method":"Node.Shutdown","params":[], "id":95}`) // todo remove, this is just for convenience
+	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
+	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
+	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
+	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":" ", "Rel":" "}], "id":85}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 	for {

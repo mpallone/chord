@@ -18,9 +18,9 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
-	"strings"
 )
 
 // server configuration object read in
@@ -80,28 +80,30 @@ var dict = map[KeyRelPair]TripVal{}
 
 // Hash the key and rel, concatenate the lower order bits together,
 // and return the result as a *big.Int.
+//
+// Leading and trailing whitespace on the key and rel are ignored.
 func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
-	tripletKeyHash := chord.GetChordID(tripletKey)
-	tripletRelHash := chord.GetChordID(tripletRel)
-	fmt.Println(" @@@   initial tripletKeyHash:", tripletKeyHash) // todo remove
-	fmt.Println(" @@@   initial tripletRelHash:", tripletRelHash) // todo remove
+	tripletKeyHash := chord.GetChordID(strings.TrimSpace(tripletKey))
+	tripletRelHash := chord.GetChordID(strings.TrimSpace(tripletRel))
+	// fmt.Println(" @@@   initial tripletKeyHash:", tripletKeyHash) // todo remove
+	// fmt.Println(" @@@   initial tripletRelHash:", tripletRelHash) // todo remove
 
 	lowOrderBitMask := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(chord.MBits/2)), nil)
 	lowOrderBitMask = new(big.Int).Sub(lowOrderBitMask, big.NewInt(1))
 
-	fmt.Println(" @@@   getDict3ChordKey, lowOrderBitMask:", lowOrderBitMask) // todo remove
+	// fmt.Println(" @@@   getDict3ChordKey, lowOrderBitMask:", lowOrderBitMask) // todo remove
 
 	// Extract the low order bits from each hash
 	tripletKeyHash = new(big.Int).And(tripletKeyHash, lowOrderBitMask)
 	tripletRelHash = new(big.Int).And(tripletRelHash, lowOrderBitMask)
 
-	fmt.Println(" @@@   tripletKeyHash after applying mask:", tripletKeyHash) // todo remove
-	fmt.Println(" @@@   tripletRelHash after applying mask:", tripletRelHash) // todo remove
+	// fmt.Println(" @@@   tripletKeyHash after applying mask:", tripletKeyHash) // todo remove
+	// fmt.Println(" @@@   tripletRelHash after applying mask:", tripletRelHash) // todo remove
 
 	chordKey := new(big.Int).Lsh(tripletKeyHash, uint(chord.MBits/2))
 	chordKey = new(big.Int).Or(chordKey, tripletRelHash)
 
-	fmt.Println(" @@@   returning chordKey:", chordKey)
+	// fmt.Println(" @@@   returning chordKey:", chordKey)
 
 	return chordKey
 }
@@ -109,45 +111,73 @@ func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
 // LOOKUP(keyA, relationA)
 func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
-    fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
+	fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
-    // Remove any leading or trailing whitespace: 
-    dict3key := strings.TrimSpace(string(args.Key))
-    dict3rel := strings.TrimSpace(string(args.Rel))
+	// Remove any leading or trailing whitespace:
+	tripletKey := strings.TrimSpace(string(args.Key))
+	tripletRel := strings.TrimSpace(string(args.Rel))
 
-    fmt.Println(" @@@ stripped dict3key:", dict3key)
-    fmt.Println(" @@@ stripped dict3rel:", dict3rel)
+	fmt.Println(" @@@ stripped tripletKey:", tripletKey)
+	fmt.Println(" @@@ stripped tripletRel:", tripletRel)
 
-    if len(dict3key) != 0 && len(dict3rel) != 0 {
+	if len(tripletKey) != 0 && len(tripletRel) != 0 {
 
-        fmt.Println(" *** Performing a 'normal' lookup on ", dict3key, dict3rel)
+		fmt.Println(" *** Performing a 'normal' lookup on ", tripletKey, tripletRel)
 
-    } else if len(dict3key) != 0 && len(dict3rel) == 0 {
+		chordKey := getDict3ChordKey(tripletKey, tripletRel)
+		successor, err := chord.FindSuccessor(chordKey)
+		if err != nil {
+			fmt.Println("Lookup (normal case) received an error when calling FindSuccessor(): ", err)
+			// todo - populate the reply with the error or whatever the standard thing to do is
+			return err
+		}
 
-        fmt.Println(" *** Performing a key-only partial match on ", dict3key)
+		// If I'm the successor, just look in my local key store.
+		if chord.ChordNodePtrsAreEqual(&successor, &chord.FingerTable[chord.SELF]) {
+			// construct temp KeyRelPair
+			krp := KeyRelPair{args.Key, args.Rel}
 
-    } else if len(dict3key) == 0 && len(dict3rel) != 0 {
+			// return triplet Value if KeyRelPair exists
+			if tempVal, exists := dict[krp]; exists {
+				reply.Key = args.Key
+				reply.Rel = args.Rel
+				reply.Val = tempVal
+				fmt.Println(" ... Triplet found in DICT3.")
+			} else {
+				fmt.Println(" ... Triplet NOT found in DICT3.")
+			}
+		} else {
+			// Otherwise, just forward the request to the successor.
+			chord.CallRPC("Node.Lookup", &args, &reply, &successor)
+		}
 
-        fmt.Println(" *** Performing a rel-only partial match on ", dict3rel)
+	} else if len(tripletKey) != 0 && len(tripletRel) == 0 {
 
-    } else {
+		fmt.Println(" *** Performing a key-only partial match on ", tripletKey)
 
-        fmt.Println(" *** Lookup RPC called with invalid args:", args)
-    }
+	} else if len(tripletKey) == 0 && len(tripletRel) != 0 {
 
-    // // construct temp KeyRelPair
-    // krp := KeyRelPair{args.Key, args.Rel}
+		fmt.Println(" *** Performing a rel-only partial match on ", tripletRel)
 
-    // // return triplet Value if KeyRelPair exists
-    // if tempVal, exists := dict[krp]; exists {
-    //  reply.Key = args.Key
-    //  reply.Rel = args.Rel
-    //  reply.Val = tempVal
-    //  fmt.Println(" ... Triplet found in DICT3.")
-    // } else {
-    //  fmt.Println(" ... Triplet NOT found in DICT3.")
-    // }
-    // return nil
+	} else {
+
+		fmt.Println(" *** Lookup RPC called with invalid args:", args)
+	}
+
+	// // construct temp KeyRelPair
+	// krp := KeyRelPair{args.Key, args.Rel}
+
+	// // return triplet Value if KeyRelPair exists
+	// if tempVal, exists := dict[krp]; exists {
+	//  reply.Key = args.Key
+	//  reply.Rel = args.Rel
+	//  reply.Val = tempVal
+	//  fmt.Println(" ... Triplet found in DICT3.")
+	// } else {
+	//  fmt.Println(" ... Triplet NOT found in DICT3.")
+	// }
+
+	return nil
 }
 
 // INSERT(keyA, relationA, valA)
@@ -156,12 +186,8 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 	//fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
 
 	//create the key and relationship concatenated ID
-	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
-
-	/////////////// MCP testing //////////////
-	newChordId := getDict3ChordKey(string(args.Key), string(args.Rel))
-	fmt.Println(" @@@ newChordId:", newChordId)
-	//////////////////////////////////////////
+	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
 
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
@@ -235,7 +261,8 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 	fmt.Print("  Delete:     ", args.Key, ", ", args.Rel)
 
 	//create the key and relationship concatenated ID
-	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
 
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
@@ -384,7 +411,8 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 
 		// loop thru local DICT3 and find all keys that need to be transferred
 		for kr, v := range dict {
-			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+			// var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+			var chordKeyRelID = getDict3ChordKey(string(kr.Key), string(kr.Rel))
 
 			// transfer: key.ID > my.ID && keyID <= joining_node.ID
 			if (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) && (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) {
@@ -415,7 +443,8 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 
 		// loop thru local DICT3 and find all keys that need to be transferred
 		for kr, v := range dict {
-			var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+			// var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+			var chordKeyRelID = getDict3ChordKey(string(kr.Key), string(kr.Rel))
 
 			// transfer: key.ID > my.ID || keyID <= joining_node.ID
 			if (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) || (chordKeyRelID.Cmp(args.ChordNodePtr.ChordID) <= 0) {
@@ -451,7 +480,8 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 // looking up findsuccessor
 func (t *Node) TransferInsert(args *Args, reply *InsertReply) error {
 
-	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
 
 	fmt.Print(" TransferInsert: ", "chordID: ", "(", keyRelID, ") ", args.Key, ", ", args.Rel, ", ", args.Val)
 
@@ -631,7 +661,8 @@ func deleteAnyTransferredKeys() error {
 		// if my predecessor has a NodeID < me
 		if chord.Predecessor.ChordID.Cmp(chord.FingerTable[0].ChordID) < 0 {
 			for kr, _ := range dict {
-				var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+				// var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+				var chordKeyRelID = getDict3ChordKey(string(kr.Key), string(kr.Rel))
 
 				//delete key if keyID <= predecessor OR keyID > me
 				if (chordKeyRelID.Cmp(chord.Predecessor.ChordID) <= 0) || (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
@@ -647,7 +678,8 @@ func deleteAnyTransferredKeys() error {
 		// if my predecessor has a NodeID > me:
 		if chord.Predecessor.ChordID.Cmp(chord.FingerTable[0].ChordID) > 0 {
 			for kr, _ := range dict {
-				var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+				// var chordKeyRelID = chord.GetChordID(string(kr.Key) + string(kr.Rel))
+				var chordKeyRelID = getDict3ChordKey(string(kr.Key), string(kr.Rel))
 
 				//delete key if KeyID <= predID AND keyID > me
 				if (chordKeyRelID.Cmp(chord.Predecessor.ChordID) <= 0) && (chordKeyRelID.Cmp(chord.FingerTable[0].ChordID) > 0) {
@@ -666,8 +698,9 @@ func deleteAnyTransferredKeys() error {
 	fmt.Printf("Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
 	fmt.Println("DICT3 contents are now: ")
 	for k, v := range dict {
-		var chordKey = string(k.Key) + string(k.Rel)
-		fmt.Printf(" (%d)", chord.GetChordID(chordKey))
+		// var chordKey = string(k.Key) + string(k.Rel)
+		// fmt.Printf(" (%d)", chord.GetChordID(chordKey))
+		fmt.Printf(" (%d)", getDict3ChordKey(string(k.Key), string(k.Rel)))
 		fmt.Println("  ", k, v)
 		numKeys++
 	}
@@ -717,9 +750,10 @@ func openPersistentStorageContainer(pathToStorageContainer string) {
 	dec.Decode(&dict)
 	fmt.Println("   DICT3 contents stored on disk: ")
 	for k, v := range dict {
-		var chordKey = string(k.Key) + string(k.Rel)
+		// var chordKey = string(k.Key) + string(k.Rel)
 		fmt.Print("    ", k, v)
-		fmt.Printf("     Chord Key-Rel ID: %d\n", chord.GetChordID(chordKey))
+		// fmt.Printf("     Chord Key-Rel ID: %d\n", chord.GetChordID(chordKey))
+		fmt.Printf("     Chord Key-Rel ID: %d\n", getDict3ChordKey(string(k.Key), string(k.Rel)))
 	}
 	storageFile.Close()
 }
