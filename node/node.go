@@ -51,10 +51,24 @@ type KeyRelPair struct {
 	Rel TripRel
 }
 
+// todo - just use the Triplets struct. Args is not a good name.
 type Args struct {
 	Key TripKey
 	Rel TripRel
 	Val TripVal // only used for insert and insertOrUpdate,
+}
+
+type Triplet struct {
+	Key TripKey
+	Rel TripRel
+	Val TripVal
+}
+
+type GetTripletsByKeyArgs struct {
+	Key TripKey
+}
+type GetTripletsByKeyReply struct {
+	TripList []Triplet
 }
 
 type LookupReply struct {
@@ -106,6 +120,28 @@ func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
 	// fmt.Println(" @@@   returning chordKey:", chordKey)
 
 	return chordKey
+}
+
+// Returns a list of triplets that have the given key.
+// Only looks in the local dictionary; does not send
+// queries across the network.
+func (t *Node) GetTripletsByKey(args *GetTripletsByKeyArgs, reply *GetTripletsByKeyReply) error {
+
+	var listOfTriplets []Triplet
+
+	for keyRelPair, _ := range dict {
+		if keyRelPair.Key == args.Key {
+			var currTriplet Triplet
+			currTriplet.Key = keyRelPair.Key
+			currTriplet.Rel = keyRelPair.Rel
+			currTriplet.Val = dict[keyRelPair]
+			listOfTriplets = append(listOfTriplets, currTriplet)
+		}
+	}
+
+	reply.TripList = listOfTriplets
+
+	return nil
 }
 
 // LOOKUP(keyA, relationA)
