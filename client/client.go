@@ -55,7 +55,6 @@ func main() {
 	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
 	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
 	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
-	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":" ", "Rel":" "}], "id":85}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 	for {
