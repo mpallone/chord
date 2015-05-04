@@ -71,10 +71,22 @@ type GetTripletsByKeyReply struct {
 	TripList []Triplet
 }
 
+type SearchRingForKeyArgs struct {
+	Key             TripKey
+	LastNodeInQuery chord.ChordNodePtr
+}
+type SearchRingForKeyReply struct {
+	TripList []Triplet
+}
+
+// To keep things uniform between regular queries and partial
+// match queries, have LookupReply always return a list of
+// triplets.
 type LookupReply struct {
-	Key TripKey
-	Rel TripRel
-	Val TripVal
+	// Key TripKey
+	// Rel TripRel
+	// Val TripVal
+	TripList []Triplet
 }
 type InsertReply struct {
 	TripletInserted bool
@@ -125,6 +137,8 @@ func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
 // Returns a list of triplets that have the given key.
 // Only looks in the local dictionary; does not send
 // queries across the network.
+// todo - not sure if I actually need this method. Delete it if this RPC is
+//        never actually called.
 func (t *Node) GetTripletsByKey(args *GetTripletsByKeyArgs, reply *GetTripletsByKeyReply) error {
 
 	var listOfTriplets []Triplet
@@ -144,6 +158,114 @@ func (t *Node) GetTripletsByKey(args *GetTripletsByKeyArgs, reply *GetTripletsBy
 	return nil
 }
 
+// Used for key-only partial match queries. Returns the lowest
+// possible ChordID that could have the specified key, and the
+// highest possible ChordID that could have the specified key
+// (in that order).
+func getLowestAndHighestValuesFromKey(key string) (*big.Int, *big.Int) {
+	dummyKey := getDict3ChordKey(key, "fakeRelValueThatWillBeMaskedAwayAnyway")
+
+	lowOrderBitMask := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(chord.MBits/2)), nil)
+	lowOrderBitMask = new(big.Int).Sub(lowOrderBitMask, big.NewInt(1))
+
+	// fmt.Println(" @@@ lowOrderBitMask:", lowOrderBitMask) // todo remove
+
+	highestPossibleValue := new(big.Int).Or(lowOrderBitMask, dummyKey)
+
+	// fmt.Println(" @@@ highestPossibleValue:", highestPossibleValue) // todo remove
+
+	highOrderBitMask := new(big.Int).Lsh(lowOrderBitMask, uint(chord.MBits/2))
+
+	// fmt.Println(" @@@ highOrderBitMask:", highOrderBitMask) // todo remove
+
+	lowestPossibleValue := new(big.Int).And(highOrderBitMask, dummyKey)
+
+	// fmt.Println(" @@@ lowestPossibleValue:", lowestPossibleValue) // todo remove
+
+	return lowestPossibleValue, highestPossibleValue
+}
+
+// Looks in its own dictionary for the key, and asks
+// successor to do the same. Stops recursing when
+// successor can't have any keys of the same value.
+func (t *Node) SearchRingForKey(args *SearchRingForKeyArgs, reply *SearchRingForKeyReply) error {
+
+	fmt.Println("SearchRingForKey RPC called, args=", args)
+
+	lowestPossibleKey, highestPossibleKey := getLowestAndHighestValuesFromKey(string(args.Key))
+
+	var listOfTriplets []Triplet
+
+	// If I can't possibly contain a key in range(lowestPossibleKey, highestPossibleKey),
+	// then just return the empty list.
+	if chord.Inclusive_in(chord.FingerTable[chord.SELF].ChordID, chord.AddOne(args.LastNodeInQuery.ChordID),
+		chord.SubOne(lowestPossibleKey)) {
+		fmt.Println(" @@@ termination case with no local search of dict") // todo remove
+		reply.TripList = listOfTriplets
+		return nil
+	}
+
+	// If I'm the "end of the line", then search my local dict, but don't ask
+	// any other nodes to do the same.
+	singleNodeNetwork := chord.ChordNodePtrsAreEqual(&chord.FingerTable[0], &chord.FingerTable[1])
+	if singleNodeNetwork || chord.Inclusive_in(highestPossibleKey, chord.Predecessor.ChordID, chord.FingerTable[chord.SELF].ChordID) {
+		fmt.Println(" @@@ termination case with local search of dict ") // todo remove
+		for keyRelPair, _ := range dict {
+			if keyRelPair.Key == args.Key {
+				var currTriplet Triplet
+				currTriplet.Key = keyRelPair.Key
+				currTriplet.Rel = keyRelPair.Rel
+				currTriplet.Val = dict[keyRelPair]
+				listOfTriplets = append(listOfTriplets, currTriplet)
+			}
+		}
+		reply.TripList = listOfTriplets
+		return nil
+	}
+
+	fmt.Println(" @@@ continuation case")
+
+	// Now, the tricky(ish) part: I need to check my local dict for matching
+	// keys, *and* I need to ask my successor if it has matching keys.
+	tripListChannel := make(chan []Triplet)
+	go callSearchRingForKeyOnSuccessor(string(args.Key), chord.FingerTable[1], args.LastNodeInQuery, tripListChannel)
+	// Search the local dict while that RPC is running:
+	for keyRelPair, _ := range dict {
+		if keyRelPair.Key == args.Key {
+			var currTriplet Triplet
+			currTriplet.Key = keyRelPair.Key
+			currTriplet.Rel = keyRelPair.Rel
+			currTriplet.Val = dict[keyRelPair]
+			listOfTriplets = append(listOfTriplets, currTriplet)
+		}
+	}
+
+	var tripletsFromSuccessor []Triplet
+	tripletsFromSuccessor = <-tripListChannel // this blocks until the RPC returns
+
+	for _, newTriplet := range tripletsFromSuccessor {
+		listOfTriplets = append(listOfTriplets, newTriplet)
+	}
+
+	reply.TripList = listOfTriplets
+	return nil
+}
+
+// This is intended to independently (and concurrently) invoke the SearchRingForKey
+// RPC on our successor, so that we can do other stuff while we wait for the
+// successor to reply.
+func callSearchRingForKeyOnSuccessor(key string, successor chord.ChordNodePtr,
+	lastNodeInQuery chord.ChordNodePtr,
+	tripListChannel chan []Triplet) {
+	var searchRingForKeyArgs SearchRingForKeyArgs
+	var searchRingForKeyReply SearchRingForKeyReply
+	searchRingForKeyArgs.Key = TripKey(key)
+	searchRingForKeyArgs.LastNodeInQuery = lastNodeInQuery
+	// todo - don't forget to catch the error
+	chord.CallRPC("Node.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &successor)
+	tripListChannel <- searchRingForKeyReply.TripList
+}
+
 // LOOKUP(keyA, relationA)
 func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
@@ -152,9 +274,6 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 	// Remove any leading or trailing whitespace:
 	tripletKey := strings.TrimSpace(string(args.Key))
 	tripletRel := strings.TrimSpace(string(args.Rel))
-
-	fmt.Println(" @@@ stripped tripletKey:", tripletKey)
-	fmt.Println(" @@@ stripped tripletRel:", tripletRel)
 
 	if len(tripletKey) != 0 && len(tripletRel) != 0 {
 
@@ -175,9 +294,16 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
 			// return triplet Value if KeyRelPair exists
 			if tempVal, exists := dict[krp]; exists {
-				reply.Key = args.Key
-				reply.Rel = args.Rel
-				reply.Val = tempVal
+				// reply.Key = args.Key
+				// reply.Rel = args.Rel
+				// reply.Val = tempVal
+				var triplet Triplet
+				triplet.Key = args.Key
+				triplet.Rel = args.Rel
+				triplet.Val = tempVal
+				var listOfTriplets []Triplet
+				listOfTriplets = append(listOfTriplets, triplet)
+				reply.TripList = listOfTriplets
 				fmt.Println(" ... Triplet found in DICT3.")
 			} else {
 				fmt.Println(" ... Triplet NOT found in DICT3.")
@@ -191,6 +317,31 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 
 		fmt.Println(" *** Performing a key-only partial match on ", tripletKey)
 
+		lowestPossibleKey, highestPossibleKey := getLowestAndHighestValuesFromKey(tripletKey)
+		fmt.Println(" @@@ lowestPossibleKey:", lowestPossibleKey)   // todo
+		fmt.Println(" @@@ highestPossibleKey:", highestPossibleKey) // todo
+
+		startNode, err := chord.FindSuccessor(lowestPossibleKey)
+		if err != nil {
+			fmt.Println(" *** key-only search failed to call FindSuccessor with err=", err)
+			return err
+		}
+		stopNode, err := chord.FindSuccessor(highestPossibleKey)
+		if err != nil {
+			fmt.Println(" *** key-only search failed to call FindSuccessor with err=", err)
+			return err
+		}
+
+		fmt.Println(" @@@ key-only search would start with node: ", startNode)
+		fmt.Println(" @@@ key-only search would stop with node: ", stopNode)
+
+		var searchRingForKeyArgs SearchRingForKeyArgs
+		var searchRingForKeyReply SearchRingForKeyReply
+		searchRingForKeyArgs.Key = TripKey(tripletKey)
+		searchRingForKeyArgs.LastNodeInQuery = stopNode
+		chord.CallRPC("Node.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &startNode)
+		reply.TripList = searchRingForKeyReply.TripList
+
 	} else if len(tripletKey) == 0 && len(tripletRel) != 0 {
 
 		fmt.Println(" *** Performing a rel-only partial match on ", tripletRel)
@@ -198,6 +349,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 	} else {
 
 		fmt.Println(" *** Lookup RPC called with invalid args:", args)
+		// todo - return errors.New or whatever
 	}
 
 	// // construct temp KeyRelPair
@@ -671,11 +823,13 @@ func join(existingNodeIpAddress string, existingNodePort string) {
 
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("2s")
+	duration, _ := time.ParseDuration("3s")
 	for chord.RunStabilize {
 		time.Sleep(duration)
 		chord.Stabilize()
 		deleteAnyTransferredKeys()
+
+		fmt.Println("Finger Table:", chord.FingerTable)
 
 		//fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
 		//fmt.Println("periodicallyStabilize(), myself   :", chord.FingerTable[0])
