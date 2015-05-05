@@ -276,25 +276,20 @@ func callSearchRingForKeyOnSuccessor(key string, successor chord.ChordNodePtr,
 	tripListChannel <- searchRingForKeyReply.TripList
 }
 
+// Partial match query for the Rel-only case. Searches all nodes (we decided to keep
+// m = 160 so that we didn't have to deal with collision) using the algorithm Kalpakis
+// gave us so that latency is logarithmic. The logarithmic latency is due to how this
+// routine farms out searching all nodes to fingers.
 func (t *Node) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRingForRelReply) error {
 
 	relOnlyPartialMatchQueryCount += 1
-
-	// todo - verify that we're not returning duplicates (I don't think we are)
 
 	fmt.Println(" @@@ SearchRingForRel RPC called on node", chord.FingerTable[0].ChordID)
 	fmt.Println(" @@@ StartVal: ", args.StartValue)
 	fmt.Println(" @@@ StopVal: ", args.StopValue)
 
-	// If a single node network, just search locally.
-	singleNodeNetwork := chord.ChordNodePtrsAreEqual(&chord.FingerTable[0], &chord.FingerTable[1])
-	if singleNodeNetwork {
-		// do a local search (todo)
-		fmt.Println(" @@@ Single node network. ")
-		return nil
-	}
-
-	// queriedNodes := make(map[chord.ChordNodePtr]bool)
+	callCount := 0
+	tripListChannel := make(chan []Triplet)
 
 	for i := 1; i <= chord.MBits; i++ {
 		currChordID := chord.FingerTable[i].ChordID
@@ -309,56 +304,66 @@ func (t *Node) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRingFor
 
 			// Skip entries that search for nil ranges
 			if currChordID.Cmp(nextChordID) == 0 {
-				fmt.Println(" @@@ Skipping finger at index =", i, "because it's the same as the one that follows it")
 				continue
 			}
-			// // Skip nodes we've already queried (useful for tiny networks with redundant fingers)
-			// if _, ok := queriedNodes[chord.FingerTable[i]]; ok {
-			// 	fmt.Println("Skipping finger at index =", i, "because it's been queried already")
-			// 	continue
-			// } else {
-			// 	queriedNodes[chord.FingerTable[i]] = true
-			// }
-
-			fmt.Println(" @@@ checking finger ID:", chord.FingerTable[i].ChordID, " [", i, "]")
-			fmt.Println(" @@@ currChordID:", currChordID)
-			fmt.Println(" @@@ nextChordID:", nextChordID)
 
 			newStartValue := chord.AddOne(currChordID)
-			// newStopValue := nextChordID
 			newStopValue := chord.SubOne(nextChordID)
 
 			// Don't look beyond where we're responsible for looking.
 			if chord.Inclusive_in(args.StopValue, newStartValue, chord.SubOne(newStopValue)) {
-				fmt.Println(" ### DECREASING SEARCH RANGE")
-				fmt.Println(" ### ORIGINALLY: [", newStartValue, ",", newStopValue, "]")
 				newStopValue = args.StopValue
-				fmt.Println(" ### NOW       : [", newStartValue, ",", newStopValue, "]")
-
 			}
 
 			if newStartValue.Cmp(newStopValue) != 0 {
-				var newArgs SearchRingForRelArgs
-				var newReply SearchRingForRelReply
-				newArgs.Rel = args.Rel
-				newArgs.StartValue = newStartValue
-				newArgs.StopValue = newStopValue
 
-				// todo remove
-				duration, _ := time.ParseDuration("0.4s")
-				time.Sleep(duration)
-				//
 				fmt.Println(" @@@@@@ Calling SearchRingForRel RPC on ", chord.FingerTable[i].ChordID, " [", i, "]", "startValue=", newStartValue, "stopValue=", newStopValue)
-				chord.CallRPC("Node.SearchRingForRel", &newArgs, &newReply, &chord.FingerTable[i])
+				callCount += 1
+				go callSearchRingForRelOnSpecifiedNode(string(args.Rel), newStartValue, newStopValue,
+					chord.FingerTable[i], tripListChannel)
 			}
 
 		} else {
-			fmt.Println(" @@@ Breaking out of the loop at finger table index =", i) // todo remove
 			break
 		}
 	}
 
+	// Search locally for the rel's while we wait for the RPCs to respond
+	var listOfTriplets []Triplet
+	for keyRelPair, _ := range dict {
+		if keyRelPair.Rel == args.Rel {
+			var currTriplet Triplet
+			currTriplet.Key = keyRelPair.Key
+			currTriplet.Rel = keyRelPair.Rel
+			currTriplet.Val = dict[keyRelPair]
+			listOfTriplets = append(listOfTriplets, currTriplet)
+		}
+	}
+
+	for i := 0; i < callCount; i++ {
+		rpcTripletList := <-tripListChannel
+		listOfTriplets = append(listOfTriplets, rpcTripletList...)
+	}
+
+	reply.TripList = listOfTriplets
 	return nil
+}
+
+// This is intended to independently (and concurrently) invoke the SearchRingForRel
+// RPC on the specified node, so that we can do other stuff while we wait for the
+// successor to reply.
+func callSearchRingForRelOnSpecifiedNode(rel string, startValue *big.Int, stopValue *big.Int, node chord.ChordNodePtr,
+	tripListChannel chan []Triplet) {
+
+	var args SearchRingForRelArgs
+	var reply SearchRingForRelReply
+	args.Rel = TripRel(rel)
+	args.StartValue = startValue
+	args.StopValue = stopValue
+
+	// todo - don't forget to catch the error
+	chord.CallRPC("Node.SearchRingForRel", &args, &reply, &node)
+	tripListChannel <- reply.TripList
 }
 
 // LOOKUP(keyA, relationA)
@@ -446,8 +451,8 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 		searchRingForRelArgs.StartValue = chord.FingerTable[1].ChordID
 		searchRingForRelArgs.StopValue = chord.SubOne(searchRingForRelArgs.StartValue)
 		chord.CallRPC("Node.SearchRingForRel", &searchRingForRelArgs, &searchRingForRelReply, &chord.FingerTable[1])
+		reply.TripList = searchRingForRelReply.TripList // todo - may have to check for duplicates if network is unstable
 		fmt.Println(" *** Finished performing the rel-only partial match on ", tripletRel)
-		// todo - not sure if the RPC gets invoked on *ME*. Might need to check my local triplets, too.
 
 	} else {
 
