@@ -46,10 +46,10 @@ case $out_mode in
         client client.cfg
         ;;
     tmux)
-        tmux new-window -n "CLIENT" "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg; cat -"
+        tmux new-window -n "CLIENT" "echo Press CTL-D to send; cat - $client_msgs - | ${GOPATH}/bin/client client.cfg;"
         tmux -2 attach-session -d
         ;;
     gnome-terminal)
-	    gnome-terminal -x bash -c "echo Press CTL-D to send; cat - $client_msgs | ${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
+	    gnome-terminal -x bash -c "echo Press CTL-D to send; cat - $client_msgs - | ${GOPATH}/bin/client client.cfg" --window-with-profile=HOLD_OPEN --title="CLIENT"
         ;;
 esac
