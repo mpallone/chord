@@ -30,6 +30,11 @@ var runListener = true
 var listenerDone = false
 var shutdownDone = false
 
+type JoinChordRingOnStartUp struct {
+	IpAddress string
+	Port      string
+}
+
 type ServerConfiguration struct {
 	ServerID                   string
 	Protocol                   string
@@ -39,6 +44,7 @@ type ServerConfiguration struct {
 		File string
 	}
 	Methods []string
+	Join    *JoinChordRingOnStartUp
 }
 
 type Node int
@@ -1012,9 +1018,9 @@ func main() {
 	// display this node's ID based on SHA-1 hash value
 	fmt.Printf("Chord Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
 
-	// TODO put this in config file
-	// bootstrap, first node with port number 7001 creates the ring, and the rest join
-	if conf.Port == "7001" {
+	// if the configuration file does not specify a 'join' member field, then
+	// create a chord ring
+	if conf.Join == nil {
 		chord.Create(conf.IpAddress, conf.Port)
 		//fmt.Println("Finger Table: ", chord.FingerTable)
 	} else {
@@ -1026,8 +1032,7 @@ func main() {
 		duration, _ := time.ParseDuration("3s")
 		time.Sleep(duration)
 
-		// TODO - this hard-coded stuff should really be in the config file
-		go join("127.0.0.1", "7001")
+		go join(conf.Join.IpAddress, conf.Join.Port)
 	}
 
 	fmt.Printf("Listening on port " + conf.Port + " ...\n")

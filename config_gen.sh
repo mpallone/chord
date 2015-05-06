@@ -3,6 +3,8 @@ PROJPATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 BIND=127.0.0.1
 BASE_PORT=7000
 
+EXISTING_NODE_PORT=7001
+
 if [[ $# != 3 ]]; then
     echo Usage: $0 "<config_dir> <store_dir> <num_instances>"
     exit 1
@@ -18,13 +20,25 @@ pushd $store_dir; store_dir=`pwd`; popd
 for ((i=1; i<=$num_instances; i++)); do
     let PORT=$BASE_PORT+$i
     echo Configuring $BIND:$PORT
-	echo '{
-	"serverID"  : "'${BIND}:$PORT'",
-	"protocol"  : "tcp",
-	"ipAddress" : "'$BIND'",
-	"port"	    : "'$PORT'",
-	"persistentStorageContainer" : {"file" : "'$store_dir/dict3_${i}.gob'"},
-	"methods"   : ["lookup", "insert", "insertOrUpdate", "delete", "listKeys", "listIDs", "shutdown"] 
-}'  > $config_dir/${i}.config
+	str='{\n
+	\t"serverID"  : "'${BIND}:$PORT'",\n
+	\t"protocol"  : "tcp",\n
+	\t"ipAddress" : "'$BIND'",\n
+	\t"port"	    : "'$PORT'",\n
+	\t"persistentStorageContainer" : {"file" : "'$store_dir/dict3_${i}.gob'"},\n
+	\t"methods"   : ["lookup", "insert", "insertOrUpdate", "delete", "listKeys", "listIDs", "shutdown"]'
+
+	# node on port 7001 creates the ring if 'join' field is not set
+	if [[ $i == 1 ]]; then
+		str+='\n}'
+
+	# all others join the ring through the node on port 7001
+	else
+		str+=',\n\t"join" : {"ipAddress" : "'${BIND}'", "port" : "'${EXISTING_NODE_PORT}'"}\n'
+		str+='}'
+	fi
+
+	echo -e ${str} > $config_dir/${i}.config
 done
 cp $PROJPATH/client/client.config $config_dir/client.cfg
+
