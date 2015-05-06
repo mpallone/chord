@@ -753,7 +753,6 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 
 	fmt.Println("***Closing persistent connections.")
 	chord.ClosePersistentConnections()
-
 	shutdownDone = true
 	return nil
 }
@@ -982,6 +981,7 @@ func main() {
 	for !shutdownDone {
 		time.Sleep(time.Millisecond)
 	}
+	os.Exit(0)
 }
 func join(existingNodeIpAddress string, existingNodePort string) {
 	duration, _ := time.ParseDuration("3s")

@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
+	"net/rpc"
+	"net/rpc/jsonrpc"
 	"os"
 )
 
@@ -24,6 +25,11 @@ type ClientConfiguration struct {
 	IpAddress string
 	Port      string
 	Methods   []string
+}
+type RPCCall struct {
+	Method string
+	Params []interface{}
+	Id     int64
 }
 
 func main() {
@@ -40,7 +46,7 @@ func main() {
 
 	// connect to remote server
 	fmt.Print("Establishing connection to ", conf.IpAddress, ":", conf.Port, " ... ")
-	conn, err := net.Dial(conf.Protocol, (conf.IpAddress + ":" + conf.Port))
+	client, err := jsonrpc.Dial(conf.Protocol, (conf.IpAddress + ":" + conf.Port))
 	checkErrorCondition(err)
 	fmt.Println("Success!")
 
@@ -58,24 +64,43 @@ func main() {
 	fmt.Println(`{"method":"Node.DetermineNetworkStructure","params":[], "id":85}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
+
+	//Spawn the response reader
+	replies := make(chan *rpc.Call, 1024)
+	go readResponses(replies)
 	for {
 		fmt.Println("Please enter a properly formatted JSON message: ")
 
 		inputStr, err = rdr.ReadString('\n')
 		checkErrorCondition(err)
 
-		// send JSON message to node
-		fmt.Fprintf(conn, inputStr)
-		responseFromServer, err := bufio.NewReader(conn).ReadString('\n')
-		checkErrorCondition(err)
+		// encode message as a json object
+		var query RPCCall
+		err = json.Unmarshal([]byte(inputStr), &query)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+		if len(query.Params) < 1 {
+			fmt.Println("Params must be a single-element containing a JSON construct")
+			continue
+		}
 
-		// display JSON response message from server
-		fmt.Println("\n")
-		fmt.Println("JSON message sent: ")
-		fmt.Println(inputStr)
-		fmt.Println("JSON message received:")
-		fmt.Println(responseFromServer)
-		fmt.Println("--------------------------------------------------------------------------------------------------------------")
+		// send JSON message to node
+		client.Go(query.Method, query.Params[0], new(interface{}), replies)
+		checkErrorCondition(err)
+	}
+}
+
+func readResponses(replies chan *rpc.Call) {
+	for {
+		reply := <-replies
+		bytes, _ := json.Marshal(reply.Reply)
+		fmt.Println("JSON message received:\n",
+			"Method >", reply.ServiceMethod, "\n",
+			"Args   >", reply.Args, "\n",
+			"Reply  >", string(bytes), "\n",
+			"Error  >", reply.Error, "\n")
 	}
 }
 
