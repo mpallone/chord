@@ -110,9 +110,72 @@ type DeleteReply struct {
 	TripletDeleted bool
 }
 
+// Structs used for testing /////////////////////
+type ChordNodeState struct {
+	FingerTable [chord.MBits + 1]chord.ChordNodePtr
+	NumKeys     int
+}
+type DetermineNetworkStructureArgs struct {
+	NodeStates []ChordNodeState
+}
+type DetermineNetworkStructureReply struct {
+	NodeStates                []ChordNodeState
+	AllFingerTablesAreCorrect bool
+}
+
+/////////////////////////////////////////////////
+
 // global variable
 var dict = map[KeyRelPair]TripVal{}
 var relOnlyPartialMatchQueryCount = 0
+
+////////////////////////////////////////////////
+// Routines used for testing
+//
+
+// This routine loops around the network until it encounters a node that it's seen before.
+// It stops when it encounters a node that it's seen before.
+// Along the way, it stores the finger tables and number of keys of each node it visits.
+func (t *Node) DetermineNetworkStructure(args *DetermineNetworkStructureArgs, reply *DetermineNetworkStructureReply) error {
+
+	fmt.Println(" *** DetermineNetworkStructure RPC called.")
+
+	// Determine whether or not we should keep looping around the network
+	for i := 0; i < len(args.NodeStates); i++ {
+		fmt.Println(" *** Examining: ", args.NodeStates[i].FingerTable[chord.SELF])
+		if chord.ChordNodePtrsAreEqual(&chord.FingerTable[chord.SELF], &args.NodeStates[i].FingerTable[chord.SELF]) {
+			if i != 0 {
+				fmt.Println("DetermineNetworkStructure: detected duplicate node that's not at the beginning of the list => network is not stable")
+			}
+			reply.AllFingerTablesAreCorrect = checkFingerTables(args.NodeStates)
+			reply.NodeStates = args.NodeStates
+			return nil
+		}
+	}
+
+	var myState ChordNodeState
+	myState.NumKeys = len(dict)
+	for i := 0; i < chord.MBits+1; i++ {
+		myState.FingerTable[i] = chord.FingerTable[i]
+	}
+
+	args.NodeStates = append(args.NodeStates, myState)
+
+	chord.CallRPC("Node.DetermineNetworkStructure", &args, &reply, &chord.FingerTable[1])
+
+	return nil
+}
+
+func checkFingerTables(nodeStates []ChordNodeState) bool {
+
+	// if the node IDs aren't in strictly increasing order, return False
+
+	// otherwise, check each finger entry of each node
+
+	return false
+}
+
+////////////////////////////////////////////////
 
 // Hash the key and rel, concatenate the lower order bits together,
 // and return the result as a *big.Int.
