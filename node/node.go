@@ -123,6 +123,13 @@ type DetermineNetworkStructureReply struct {
 	AllFingerTablesAreCorrect bool
 }
 
+type IsNetworkStableArgs struct {
+	Dummy int
+}
+type IsNetworkStableReply struct {
+	NetworkIsStable bool
+}
+
 /////////////////////////////////////////////////
 
 // global variable
@@ -132,6 +139,66 @@ var relOnlyPartialMatchQueryCount = 0
 ////////////////////////////////////////////////
 // Routines used for testing
 //
+
+// Just calls DetermineNetworkStructure on our successor 3 times, returning true iff each call returns
+// the same results. Waits 5 seconds in between each call to give the network time to shift around.
+func (t *Node) DetermineIfNetworkIsStable(args *IsNetworkStableArgs, reply *IsNetworkStableReply) error {
+
+	fmt.Println(" *** DetermineIfNetworkIsStable RPC called. Please allow 15-20 seconds for a response. ")
+
+	var args1 DetermineNetworkStructureArgs
+	var args2 DetermineNetworkStructureArgs
+	var args3 DetermineNetworkStructureArgs
+
+	var reply1 DetermineNetworkStructureReply
+	var reply2 DetermineNetworkStructureReply
+	var reply3 DetermineNetworkStructureReply
+
+	fmt.Println("First of three calls...")
+	chord.CallRPC("Node.DetermineNetworkStructure", &args1, &reply1, &chord.FingerTable[1])
+
+	duration, _ := time.ParseDuration("5s")
+	time.Sleep(duration)
+	fmt.Println("Second of three calls...")
+	chord.CallRPC("Node.DetermineNetworkStructure", &args2, &reply2, &chord.FingerTable[1])
+
+	time.Sleep(duration)
+	fmt.Println("Third of three calls.")
+	chord.CallRPC("Node.DetermineNetworkStructure", &args3, &reply3, &chord.FingerTable[1])
+
+	// Verify that the results are all the same lengths.
+	if len(reply1.NodeStates) != len(reply2.NodeStates) || len(reply2.NodeStates) != len(reply3.NodeStates) {
+		reply.NetworkIsStable = false
+		return nil
+	}
+
+	// Verify that reply1 matches reply2
+	for nodeIndex := 0; nodeIndex < len(reply1.NodeStates); nodeIndex++ {
+		for fingerTableIndex := 0; fingerTableIndex < chord.MBits+1; fingerTableIndex++ {
+			reply1Finger := reply1.NodeStates[nodeIndex].FingerTable[fingerTableIndex]
+			reply2Finger := reply2.NodeStates[nodeIndex].FingerTable[fingerTableIndex]
+			if !chord.ChordNodePtrsAreEqual(&reply1Finger, &reply2Finger) {
+				reply.NetworkIsStable = false
+				return nil
+			}
+		}
+	}
+
+	// Verify that reply2 matches reply3
+	for nodeIndex := 0; nodeIndex < len(reply3.NodeStates); nodeIndex++ {
+		for fingerTableIndex := 0; fingerTableIndex < chord.MBits+1; fingerTableIndex++ {
+			reply2Finger := reply2.NodeStates[nodeIndex].FingerTable[fingerTableIndex]
+			reply3Finger := reply3.NodeStates[nodeIndex].FingerTable[fingerTableIndex]
+			if !chord.ChordNodePtrsAreEqual(&reply2Finger, &reply3Finger) {
+				reply.NetworkIsStable = false
+				return nil
+			}
+		}
+	}
+
+	reply.NetworkIsStable = true
+	return nil
+}
 
 // This routine loops around the network until it encounters a node that it's seen before.
 // It stops when it encounters a node that it's seen before.
