@@ -47,7 +47,7 @@ type ServerConfiguration struct {
 	Join    *JoinChordRingOnStartUp
 }
 
-type Node int
+type Requested int
 
 type TripKey string
 type TripRel string
@@ -148,7 +148,7 @@ var relOnlyPartialMatchQueryCount = 0
 
 // Just calls DetermineNetworkStructure on our successor 3 times, returning true iff each call returns
 // the same results. Waits 5 seconds in between each call to give the network time to shift around.
-func (t *Node) DetermineIfNetworkIsStable(args *IsNetworkStableArgs, reply *IsNetworkStableReply) error {
+func (t *Requested) DetermineIfNetworkIsStable(args *IsNetworkStableArgs, reply *IsNetworkStableReply) error {
 
 	fmt.Println(" *** DetermineIfNetworkIsStable RPC called. Please allow 15-20 seconds for a response. ")
 
@@ -161,16 +161,16 @@ func (t *Node) DetermineIfNetworkIsStable(args *IsNetworkStableArgs, reply *IsNe
 	var reply3 DetermineNetworkStructureReply
 
 	fmt.Println("First of three calls...")
-	chord.CallRPC("Node.DetermineNetworkStructure", &args1, &reply1, &chord.FingerTable[1])
+	chord.CallRPC("Requested.DetermineNetworkStructure", &args1, &reply1, &chord.FingerTable[1])
 
 	duration, _ := time.ParseDuration("5s")
 	time.Sleep(duration)
 	fmt.Println("Second of three calls...")
-	chord.CallRPC("Node.DetermineNetworkStructure", &args2, &reply2, &chord.FingerTable[1])
+	chord.CallRPC("Requested.DetermineNetworkStructure", &args2, &reply2, &chord.FingerTable[1])
 
 	time.Sleep(duration)
 	fmt.Println("Third of three calls.")
-	chord.CallRPC("Node.DetermineNetworkStructure", &args3, &reply3, &chord.FingerTable[1])
+	chord.CallRPC("Requested.DetermineNetworkStructure", &args3, &reply3, &chord.FingerTable[1])
 
 	// Verify that the results are all the same lengths.
 	if len(reply1.NodeStates) != len(reply2.NodeStates) || len(reply2.NodeStates) != len(reply3.NodeStates) {
@@ -209,7 +209,7 @@ func (t *Node) DetermineIfNetworkIsStable(args *IsNetworkStableArgs, reply *IsNe
 // This routine loops around the network until it encounters a node that it's seen before.
 // It stops when it encounters a node that it's seen before.
 // Along the way, it stores the finger tables and number of keys of each node it visits.
-func (t *Node) DetermineNetworkStructure(args *DetermineNetworkStructureArgs, reply *DetermineNetworkStructureReply) error {
+func (t *Requested) DetermineNetworkStructure(args *DetermineNetworkStructureArgs, reply *DetermineNetworkStructureReply) error {
 
 	fmt.Println(" *** DetermineNetworkStructure RPC called.")
 
@@ -234,7 +234,7 @@ func (t *Node) DetermineNetworkStructure(args *DetermineNetworkStructureArgs, re
 
 	args.NodeStates = append(args.NodeStates, myState)
 
-	chord.CallRPC("Node.DetermineNetworkStructure", &args, &reply, &chord.FingerTable[1])
+	chord.CallRPC("Requested.DetermineNetworkStructure", &args, &reply, &chord.FingerTable[1])
 
 	return nil
 }
@@ -285,7 +285,7 @@ func getDict3ChordKey(tripletKey string, tripletRel string) *big.Int {
 // queries across the network.
 // todo - not sure if I actually need this method. Delete it if this RPC is
 //        never actually called.
-func (t *Node) GetTripletsByKey(args *GetTripletsByKeyArgs, reply *GetTripletsByKeyReply) error {
+func (t *Requested) GetTripletsByKey(args *GetTripletsByKeyArgs, reply *GetTripletsByKeyReply) error {
 
 	var listOfTriplets []Triplet
 
@@ -334,7 +334,7 @@ func getLowestAndHighestValuesFromKey(key string) (*big.Int, *big.Int) {
 // Looks in its own dictionary for the key, and asks
 // successor to do the same. Stops recursing when
 // successor can't have any keys of the same value.
-func (t *Node) SearchRingForKey(args *SearchRingForKeyArgs, reply *SearchRingForKeyReply) error {
+func (t *Requested) SearchRingForKey(args *SearchRingForKeyArgs, reply *SearchRingForKeyReply) error {
 
 	fmt.Println("SearchRingForKey RPC called, args=", args)
 
@@ -408,7 +408,7 @@ func callSearchRingForKeyOnSuccessor(key string, successor chord.ChordNodePtr,
 	searchRingForKeyArgs.Key = TripKey(key)
 	searchRingForKeyArgs.LastNodeInQuery = lastNodeInQuery
 	// todo - don't forget to catch the error
-	chord.CallRPC("Node.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &successor)
+	chord.CallRPC("Requested.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &successor)
 	tripListChannel <- searchRingForKeyReply.TripList
 }
 
@@ -416,7 +416,7 @@ func callSearchRingForKeyOnSuccessor(key string, successor chord.ChordNodePtr,
 // m = 160 so that we didn't have to deal with collision) using the algorithm Kalpakis
 // gave us so that latency is logarithmic. The logarithmic latency is due to how this
 // routine farms out searching all nodes to fingers.
-func (t *Node) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRingForRelReply) error {
+func (t *Requested) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRingForRelReply) error {
 
 	relOnlyPartialMatchQueryCount += 1
 
@@ -498,12 +498,12 @@ func callSearchRingForRelOnSpecifiedNode(rel string, startValue *big.Int, stopVa
 	args.StopValue = stopValue
 
 	// todo - don't forget to catch the error
-	chord.CallRPC("Node.SearchRingForRel", &args, &reply, &node)
+	chord.CallRPC("Requested.SearchRingForRel", &args, &reply, &node)
 	tripListChannel <- reply.TripList
 }
 
 // LOOKUP(keyA, relationA)
-func (t *Node) Lookup(args *Args, reply *LookupReply) error {
+func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 
 	fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
@@ -546,7 +546,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 			}
 		} else {
 			// Otherwise, just forward the request to the successor.
-			chord.CallRPC("Node.Lookup", &args, &reply, &successor)
+			chord.CallRPC("Requested.Lookup", &args, &reply, &successor)
 		}
 
 	} else if len(tripletKey) != 0 && len(tripletRel) == 0 {
@@ -575,7 +575,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 		var searchRingForKeyReply SearchRingForKeyReply
 		searchRingForKeyArgs.Key = TripKey(tripletKey)
 		searchRingForKeyArgs.LastNodeInQuery = stopNode
-		chord.CallRPC("Node.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &startNode)
+		chord.CallRPC("Requested.SearchRingForKey", &searchRingForKeyArgs, &searchRingForKeyReply, &startNode)
 		reply.TripList = searchRingForKeyReply.TripList
 
 	} else if len(tripletKey) == 0 && len(tripletRel) != 0 {
@@ -586,7 +586,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 		searchRingForRelArgs.Rel = TripRel(tripletRel)
 		searchRingForRelArgs.StartValue = chord.FingerTable[1].ChordID
 		searchRingForRelArgs.StopValue = chord.SubOne(searchRingForRelArgs.StartValue)
-		chord.CallRPC("Node.SearchRingForRel", &searchRingForRelArgs, &searchRingForRelReply, &chord.FingerTable[1])
+		chord.CallRPC("Requested.SearchRingForRel", &searchRingForRelArgs, &searchRingForRelReply, &chord.FingerTable[1])
 		reply.TripList = searchRingForRelReply.TripList // todo - may have to check for duplicates if network is unstable
 		fmt.Println(" *** Finished performing the rel-only partial match on ", tripletRel)
 
@@ -613,7 +613,7 @@ func (t *Node) Lookup(args *Args, reply *LookupReply) error {
 }
 
 // INSERT(keyA, relationA, valA)
-func (t *Node) Insert(args *Args, reply *InsertReply) error {
+func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 
 	//fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
 
@@ -624,7 +624,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
 	if err != nil {
-		fmt.Println("ERROR: Insert() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("ERROR: Insert() received an error when calling the Requested.FindSuccessor RPC: ", err)
 		fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
 		reply.TripletInserted = false
 		return err
@@ -640,7 +640,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 		//Copy reply
 		newReply := reply
 
-		err = chord.CallRPC("Node.Insert", &args, &newReply, &keyRelSuccessor)
+		err = chord.CallRPC("Requested.Insert", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Insert RPC failed to call the remote node's Insert with error:", err)
 			return err
@@ -673,7 +673,7 @@ func (t *Node) Insert(args *Args, reply *InsertReply) error {
 }
 
 // INSERTORUPDATE(keyA, relA, valA)
-func (t *Node) InsertOrUpdate(args *Args, reply *string) error {
+func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 
 	fmt.Print("  InsOrUpd: ", args.Key, ", ", args.Rel, ", ", args.Val)
 
@@ -688,7 +688,7 @@ func (t *Node) InsertOrUpdate(args *Args, reply *string) error {
 }
 
 // DELETE(keyA, relA)
-func (t *Node) Delete(args *Args, reply *DeleteReply) error {
+func (t *Requested) Delete(args *Args, reply *DeleteReply) error {
 
 	fmt.Print("  Delete:     ", args.Key, ", ", args.Rel)
 
@@ -699,7 +699,7 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
 	if err != nil {
-		fmt.Println("ERROR: Delete() received an error when calling the Node.FindSuccessor RPC: ", err)
+		fmt.Println("ERROR: Delete() received an error when calling the Requested.FindSuccessor RPC: ", err)
 		fmt.Println("address: ", chord.FingerTable[chord.SELF].IpAddress, ":", chord.FingerTable[chord.SELF].Port)
 		reply.TripletDeleted = false
 		return err
@@ -715,7 +715,7 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 		//Copy reply
 		newReply := reply
 
-		err = chord.CallRPC("Node.Delete", &args, &newReply, &keyRelSuccessor)
+		err = chord.CallRPC("Requested.Delete", &args, &newReply, &keyRelSuccessor)
 		if err != nil {
 			fmt.Println("node.go's Delete RPC failed to call the remote node's Delete with error:", err)
 		}
@@ -740,7 +740,7 @@ func (t *Node) Delete(args *Args, reply *DeleteReply) error {
 }
 
 // LISTKEYS()
-func (t *Node) ListKeys(args *Args, reply *ListKeysReply) error {
+func (t *Requested) ListKeys(args *Args, reply *ListKeysReply) error {
 
 	fmt.Println("  ListKeys ")
 
@@ -760,7 +760,7 @@ func (t *Node) ListKeys(args *Args, reply *ListKeysReply) error {
 }
 
 // LISTIDs()
-func (t *Node) ListIDs(args *Args, reply *ListIDsReply) error {
+func (t *Requested) ListIDs(args *Args, reply *ListIDsReply) error {
 
 	fmt.Println("  ListIDs")
 
@@ -773,7 +773,7 @@ func (t *Node) ListIDs(args *Args, reply *ListIDsReply) error {
 }
 
 // SHUTDOWN()
-func (t *Node) Shutdown(args *Args, reply *string) error {
+func (t *Requested) Shutdown(args *Args, reply *string) error {
 
 	fmt.Println("***Preparing to shut down. Transferring my keys to my successor...")
 
@@ -789,7 +789,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 	var setPredecessorReply chord.SetPredecessorReply
 	argsSetPredecessor.ChordNodePtr = chord.Predecessor
 
-	err := chord.CallRPC("Node.SetPredecessor", &argsSetPredecessor, &setPredecessorReply, &chord.FingerTable[1])
+	err := chord.CallRPC("Requested.SetPredecessor", &argsSetPredecessor, &setPredecessorReply, &chord.FingerTable[1])
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -800,7 +800,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 	var setSuccessorReply chord.SetSuccessorReply
 	argsSetSuccessor.ChordNodePtr = chord.FingerTable[1]
 
-	err = chord.CallRPC("Node.SetSuccessor", &argsSetSuccessor, &setSuccessorReply, &chord.Predecessor)
+	err = chord.CallRPC("Requested.SetSuccessor", &argsSetSuccessor, &setSuccessorReply, &chord.Predecessor)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -815,7 +815,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 		argXferInsert.Rel = kr.Rel
 		argXferInsert.Val = v
 
-		err := chord.CallRPC("Node.TransferInsert", &argXferInsert, &xferInsertreply, &chord.FingerTable[1])
+		err := chord.CallRPC("Requested.TransferInsert", &argXferInsert, &xferInsertreply, &chord.FingerTable[1])
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -832,7 +832,7 @@ func (t *Node) Shutdown(args *Args, reply *string) error {
 
 // invoked on an existing node in the chord ring by a joining node.  the joining node passes its IP, Port, NodeID (as a ChordNodePtr)
 // to the existing node, which then uses that information to determine which keys need to be moved to the joining node.
-func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
+func (t *Requested) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferKeysReply) error {
 	fmt.Println("TransferKeys() called. Checking to see if I need to transfer some of my keys to: Node", args.ChordNodePtr.ChordID)
 
 	var numKeysTransferred = 0
@@ -858,7 +858,7 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 				// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
 				// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
 				// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
-				err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
+				err := chord.CallRPC("Requested.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
 				if err != nil {
 					fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
 					reply.TransferKeysCompleted = false
@@ -890,7 +890,7 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 				// call to TransferInsert (just our original Insert method from project1) is needed because if we call our modified Insert method (which now
 				// calls findsuccessor BEFORE inserting in its local DICT3), the node that is responsible for transferring the keys will attempt to insert
 				// the same keys on itself - because it has no knowledge yet of the joining node as part of the chord ring at this point in time
-				err := chord.CallRPC("Node.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
+				err := chord.CallRPC("Requested.TransferInsert", &insertArgs, &insertReply, &args.ChordNodePtr)
 				if err != nil {
 					fmt.Println("node.go's TransferKeys RPC call failed to call the remote node's TransferInsert with error:", err)
 					reply.TransferKeysCompleted = false
@@ -909,7 +909,7 @@ func (t *Node) TransferKeys(args *chord.TransferKeysArgs, reply *chord.TransferK
 
 // used to allow a node to directly insert key,rel,val on another node without
 // looking up findsuccessor
-func (t *Node) TransferInsert(args *Args, reply *InsertReply) error {
+func (t *Requested) TransferInsert(args *Args, reply *InsertReply) error {
 
 	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
@@ -933,7 +933,7 @@ func (t *Node) TransferInsert(args *Args, reply *InsertReply) error {
 }
 
 //--------------CHORD WRAPPER METHODS-----------------------------
-func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
+func (t *Requested) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessorReply) error {
 	//fmt.Println("FindSuccessor wrapper called with id: ", args.Id)
 
 	var err error
@@ -946,7 +946,7 @@ func (t *Node) FindSuccessor(args *chord.ChordIDArgs, reply *chord.FindSuccessor
 }
 
 // "reply *interface{}" means that no reply is sent.
-func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
+func (t *Requested) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 	//fmt.Println("Notify wrapper called.")
 	chord.Notify(args.ChordNodePtr)
 	reply.Dummy = "Dummy Notify Response"
@@ -954,14 +954,14 @@ func (t *Node) Notify(args *chord.NotifyArgs, reply *chord.NotifyReply) error {
 }
 
 // Takes no arguments, but does send a reply.
-func (t *Node) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
+func (t *Requested) GetPredecessor(args *interface{}, reply *chord.GetPredecessorReply) error {
 	//fmt.Println("GetPredecessor() RPC called.")
 	reply.Predecessor = chord.Predecessor
 	return nil
 }
 
 // argument is a ChordNodePtr (the new predecessor)
-func (t *Node) SetPredecessor(args *chord.SetPredecessorArgs, reply *chord.SetPredecessorReply) error {
+func (t *Requested) SetPredecessor(args *chord.SetPredecessorArgs, reply *chord.SetPredecessorReply) error {
 	fmt.Printf("SetPredecessor() called, setting predecessor to: %d\n", args.ChordNodePtr.ChordID)
 
 	chord.Predecessor.IpAddress = args.ChordNodePtr.IpAddress
@@ -973,7 +973,7 @@ func (t *Node) SetPredecessor(args *chord.SetPredecessorArgs, reply *chord.SetPr
 }
 
 // argument is a ChordNodePtr (the new successor)
-func (t *Node) SetSuccessor(args *chord.SetSucessorArgs, reply *chord.SetSuccessorReply) error {
+func (t *Requested) SetSuccessor(args *chord.SetSucessorArgs, reply *chord.SetSuccessorReply) error {
 	fmt.Printf("SetSuccessor() called, setting successor to: %d\n", args.ChordNodePtr.ChordID)
 
 	chord.FingerTable[1].IpAddress = args.ChordNodePtr.IpAddress
@@ -1008,7 +1008,7 @@ func main() {
 	checkErrorCondition(err)
 
 	// register procedure call
-	n := new(Node)
+	n := new(Requested)
 	rpc.Register(n)
 
 	listener, err := net.ListenTCP(conf.Protocol, tcpAddr)
@@ -1201,7 +1201,7 @@ func checkErrorCondition(err error) {
 	}
 }
 
-func (t *Node) sigHandler() {
+func (t *Requested) sigHandler() {
 	c := make(chan os.Signal)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGKILL)
 	<-c

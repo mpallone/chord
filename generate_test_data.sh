@@ -8,7 +8,7 @@ fi
 TESTDATA_FILE=$1
 NUM_TRIPLETS=$2
 
-BEFORE_KEY='{"method":"Node.Insert", "params":[{ "Key":"'
+BEFORE_KEY='{"method":"Requested.Insert", "params":[{ "Key":"'
 MIDDLE_KEY='", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":'
 AFTER_KEY='}'
 

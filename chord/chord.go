@@ -207,7 +207,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	chordNodePtrToExistingNode.Port = existingNodePort
 	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
 
-	for CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
+	for CallRPC("Requested.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
 		//fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
 		Delay("3s")
 	}
@@ -231,7 +231,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	argsXfer.ChordNodePtr.IpAddress = FingerTable[SELF].IpAddress
 	argsXfer.ChordNodePtr.Port = FingerTable[SELF].Port
 	argsXfer.ChordNodePtr.ChordID = FingerTable[SELF].ChordID
-	err := CallRPC("Node.TransferKeys", &argsXfer, &transferKeysReply, &FingerTable[1])
+	err := CallRPC("Requested.TransferKeys", &argsXfer, &transferKeysReply, &FingerTable[1])
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -246,7 +246,7 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 // Similar to calling an RPC, this function returns an error, and populates the
 // reply pointer with whatever the RPC returns.
 //
-// rpcString: something like "node.FindSuccessor"
+// rpcString: something like "Requested.FindSuccessor"
 // args: the argument struct pointer, just as would be passed to the RPC
 // reply: the reply struct pointer, just as would be passed to the RPC. This
 //        function will populate this value with whatever the RPC returns.
@@ -395,7 +395,7 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 	var args ChordIDArgs
 	args.Id = id
 
-	err := CallRPC("Node.FindSuccessor", &args, &findSuccessorReply, &closestPrecedingFinger)
+	err := CallRPC("Requested.FindSuccessor", &args, &findSuccessorReply, &closestPrecedingFinger)
 	if err != nil {
 		fmt.Println("CallRPC() returned the following error:", err)
 	}
@@ -435,7 +435,7 @@ func Stabilize() {
 	var getPredecessorReply GetPredecessorReply
 	var args interface{}
 
-	CallRPC("Node.GetPredecessor", &args, &getPredecessorReply, &FingerTable[1])
+	CallRPC("Requested.GetPredecessor", &args, &getPredecessorReply, &FingerTable[1])
 
 	successorsPredecessor := getPredecessorReply.Predecessor
 
@@ -449,7 +449,7 @@ func Stabilize() {
 	notifyArgs.ChordNodePtr = FingerTable[SELF]
 	var reply NotifyReply
 
-	CallRPC("Node.Notify", &notifyArgs, &reply, &FingerTable[1])
+	CallRPC("Requested.Notify", &notifyArgs, &reply, &FingerTable[1])
 }
 
 // todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here

@@ -1,13 +1,13 @@
-{"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":1, "b":1} }], "id":85}
-{"method":"Node.Insert","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"a":2, "b":2} }], "id":95}
-{"method":"Node.Insert","params":[{ "Key":"keyC", "Rel":"relC", "Val":{"a":3, "b":3} }], "id":105}
-{"method":"Node.Insert","params":[{ "Key":"keyD", "Rel":"relD", "Val":{"a":4, "b":4} }], "id":115}
-{"method":"Node.Insert","params":[{ "Key":"keyD", "Rel":"relX", "Val":{"a":5, "b":5} }], "id":125}
-{"method":"Node.Lookup","params":[{ "Key":"keyA", "Rel":"relA" }], "id":130}
-{"method":"Node.Insert","params":[{ "Key":"keyC", "Rel":"relC", "Val":{"a":88, "b":88} }], "id":105}
-{"method":"Node.ListIDs", "params":[], "id": 135}
-{"method":"Node.ListKeys", "params":[], "id": 145}
-{"method":"Node.Delete","params":[{ "Key":"keyD", "Rel":"relX" }], "id":165}
-{"method":"Node.ListIDs", "params":[], "id": 170}
-{"method":"Node.InsertOrUpdate","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"a":99, "b":99} }], "id":175}
-{"method":"Node.Lookup","params":[{ "Key":"keyB", "Rel":"relB" }], "id":180}
+{"method":"Requested.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":1, "b":1} }], "id":85}
+{"method":"Requested.Insert","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"a":2, "b":2} }], "id":95}
+{"method":"Requested.Insert","params":[{ "Key":"keyC", "Rel":"relC", "Val":{"a":3, "b":3} }], "id":105}
+{"method":"Requested.Insert","params":[{ "Key":"keyD", "Rel":"relD", "Val":{"a":4, "b":4} }], "id":115}
+{"method":"Requested.Insert","params":[{ "Key":"keyD", "Rel":"relX", "Val":{"a":5, "b":5} }], "id":125}
+{"method":"Requested.Lookup","params":[{ "Key":"keyA", "Rel":"relA" }], "id":130}
+{"method":"Requested.Insert","params":[{ "Key":"keyC", "Rel":"relC", "Val":{"a":88, "b":88} }], "id":105}
+{"method":"Requested.ListIDs", "params":[], "id": 135}
+{"method":"Requested.ListKeys", "params":[], "id": 145}
+{"method":"Requested.Delete","params":[{ "Key":"keyD", "Rel":"relX" }], "id":165}
+{"method":"Requested.ListIDs", "params":[], "id": 170}
+{"method":"Requested.InsertOrUpdate","params":[{ "Key":"keyB", "Rel":"relB", "Val":{"a":99, "b":99} }], "id":175}
+{"method":"Requested.Lookup","params":[{ "Key":"keyB", "Rel":"relB" }], "id":180}

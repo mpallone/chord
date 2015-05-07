@@ -54,15 +54,15 @@ func main() {
 	var inputStr string
 	fmt.Println("===============================================================================================================")
 	fmt.Println("JSON messages entered must:")
-	fmt.Println(` -specify Node.[method name] in the "method" field`)
+	fmt.Println(` -specify Requested.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
-	fmt.Println(`Example: {"method":"Node.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
-	fmt.Println(`{"method":"Node.Shutdown","params":[], "id":95}`) // todo remove, this is just for convenience
-	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
-	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
-	fmt.Println(`{"method":"Node.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
-	fmt.Println(`{"method":"Node.DetermineIfNetworkIsStable","params":[{}], "id":85}`)
-	fmt.Println(`{"method":"Node.DetermineNetworkStructure","params":[{}], "id":85}`)
+	fmt.Println(`Example: {"method":"Requested.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
+	fmt.Println(`{"method":"Requested.Shutdown","params":[], "id":95}`) // todo remove, this is just for convenience
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
+	fmt.Println(`{"method":"Requested.DetermineIfNetworkIsStable","params":[{}], "id":85}`)
+	fmt.Println(`{"method":"Requested.DetermineNetworkStructure","params":[{}], "id":85}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 
