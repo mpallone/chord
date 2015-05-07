@@ -241,11 +241,55 @@ func (t *Node) DetermineNetworkStructure(args *DetermineNetworkStructureArgs, re
 
 func checkFingerTables(nodeStates []ChordNodeState) bool {
 
-	// if the node IDs aren't in strictly increasing order, return False
+	//Arrange into ring
+	ids := make([]big.Int, len(nodeStates))
+	for i := 0; i < len(nodeStates); i++ {
+		ids[i] = *nodeStates[i].FingerTable[i].ChordID
+	}
 
-	// otherwise, check each finger entry of each node
+	//Generate the correct finger tables
+	expectedStates := make([][]big.Int, len(nodeStates))
+	for i := 0; i < len(nodeStates); i++ {
+		expectedStates[i] = make([]big.Int, chord.MBits+1)
+		expectedStates[i][0] = ids[i]
+		for b := 1; b < chord.MBits+1; b++ {
+			base := big.NewInt(2)
+			exponent := big.NewInt(int64(b - 1))
+			ringSize := new(big.Int).Exp(base, big.NewInt(int64(chord.MBits)), nil)
+			lookupKey := new(big.Int).Add(&ids[i], new(big.Int).Exp(base, exponent, nil))
+			lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(chord.MBits)), nil))
+			var j int
+			for j = i + 1; lookupKey.Cmp(&ids[j]) != 1 && lookupKey.Cmp(new(big.Int).Add(&ids[j], ringSize)) != 1 && j != i; j = (j + 1) % len(ids) {
+				expectedStates[i][b] = ids[j]
+			}
+			if j == i { //Successor does not exist???
+				return false
+			}
+		}
+	}
 
-	return false
+	//Check the finger tables
+	realI := 0
+	expectedI := 0
+
+	//There will be an offset (a rotation of the ring)
+	for expectedI = 0; expectedI < len(expectedStates) && expectedStates[realI][0].Cmp(nodeStates[realI].FingerTable[0].ChordID) != 0; {
+		expectedI++
+	}
+	if expectedI >= len(expectedStates) {
+		return false
+	}
+
+	for realI := 0; realI < len(nodeStates); realI++ {
+		for b := 0; b < chord.MBits; b++ {
+			if expectedStates[expectedI][b].Cmp(nodeStates[realI].FingerTable[b].ChordID) != 0 {
+				return false
+			}
+		}
+		expectedI = (expectedI + 1) % len(nodeStates)
+	}
+
+	return true
 }
 
 ////////////////////////////////////////////////
