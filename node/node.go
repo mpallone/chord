@@ -6,6 +6,7 @@ node.go
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -18,12 +19,12 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
-	"bytes"
-	"strconv"
 )
+
 // layout shows by example how the reference time should be represented.
 const longForm = "1/_2/2006, 15:04:05"
 
@@ -47,9 +48,9 @@ type ServerConfiguration struct {
 	PersistentStorageContainer struct {
 		File string
 	}
-	Methods 				 []string
-	PurgeSecondsAfter          string
-	Join    *JoinChordRingOnStartUp
+	Methods           []string
+	PurgeSecondsAfter string
+	Join              *JoinChordRingOnStartUp
 }
 
 type Requested int
@@ -545,14 +546,14 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 				// reply.Key = args.Key
 				// reply.Rel = args.Rel
 				// reply.Val = tempVal
-				
+
 				//update the access time
 				accessed := time.Now().Format(longForm)
 				val := dict[krp]
 				val.Accessed = accessed
 				dict[krp] = val
 				writeDictToDisk()
-				
+
 				var triplet Triplet
 				triplet.Key = args.Key
 				triplet.Rel = args.Rel
@@ -635,8 +636,8 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 // INSERT(keyA, relationA, valA)
 func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 
-	//fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
-
+	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
+	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 	//create the key and relationship concatenated ID
 	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
@@ -670,26 +671,31 @@ func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 		reply.TripletInserted = newReply.TripletInserted
 
 	} else {
-		
+
 		//Print insert message
 		fmt.Print("  Inserting:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
 		// construct temp KeyRelPair
 		krp := KeyRelPair{args.Key, args.Rel}
 
-		//Calculate content size:
-		size, err := getBytes(args.Val.Content)
-		if err != nil {
-			fmt.Println("Error Encoding Interface", err)
-			return err
-		}
-		
-		//Convert size to string and append "bytes"
-		ContentSize := strconv.Itoa(len(size)) + "bytes"
-		
+		//Initial value of content size
+		ContentSize := "0bytes"
+
+		//Check if contents is not empty
+		if args.Val.Content != nil {
+			//Calculate size of content
+			size, err := getBytes(args.Val.Content)
+			if err != nil {
+				fmt.Println("Error Encoding Interface", err)
+				return err
+			}
+			//Convert size to string and append "bytes"
+			ContentSize = strconv.Itoa(len(size)) + "bytes"
+		} //else content size is equal to its initial value "0bytes"
+
 		//Set the content size
 		args.Val.Size = ContentSize
-		
+
 		//Get the current system date and time
 		time := time.Now().Format(longForm)
 		created := time
@@ -744,7 +750,7 @@ func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 		}
 	} else {
 		fmt.Print("  InsOrUpdate: ", args.Key, ", ", args.Rel, ", ", args.Val)
-	
+
 		// construct temp KeyRelPair
 		krp := KeyRelPair{args.Key, args.Rel}
 
@@ -754,19 +760,19 @@ func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 			fmt.Println("Error Encoding Interface", err)
 			return err
 		}
-		
+
 		//Convert size to string and append "bytes"
 		ContentSize := strconv.Itoa(len(size)) + "bytes"
-		
+
 		//Set the content size
 		args.Val.Size = ContentSize
-		
+
 		//Get the current system date and time
 		time := time.Now().Format(longForm)
 		created := time
 		modified := time
 		accessed := time
-		
+
 		// Add key-rel pair value if does not exist in dict
 		if _, exists := dict[krp]; !exists {
 			//Set all times on an insert
@@ -776,7 +782,7 @@ func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 			dict[krp] = args.Val
 			fmt.Println(" ... Writing new (or updated) triplet to disk.")
 			writeDictToDisk()
-		}else{//update
+		} else { //update
 			//Set the modified and accessed time on update
 			args.Val.Modified = modified
 			args.Val.Accessed = accessed
@@ -784,7 +790,7 @@ func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 			fmt.Println(" ... Writing new (or updated) triplet to disk.")
 			writeDictToDisk()
 		}
-		}
+	}
 	return nil
 }
 
@@ -825,15 +831,15 @@ func (t *Requested) Delete(args *Args, reply *DeleteReply) error {
 		reply.TripletDeleted = newReply.TripletDeleted
 
 	} else {
-		
+
 		//Print insert message
 		fmt.Print("  Deleting:      ", args.Key, ", ", args.Rel, ", ", args.Val)
 
-		//Check if the content is Read/Read-Write 
+		//Check if the content is Read/Read-Write
 		//Delete can proceed if file is not Read only
 		for krp := range dict {
 			val := dict[krp]
-			fmt.Println("Permission: ", val.Permission)			
+			fmt.Println("Permission: ", val.Permission)
 			if p := val.Permission; p == "R" {
 				//Read only: can not delete
 				fmt.Println("Read only: can not delete")
@@ -1326,13 +1332,13 @@ func (t *Requested) sigHandler() {
 
 //Calculate the # of bytes in an interface{}
 func getBytes(content interface{}) ([]byte, error) {
-    var buf bytes.Buffer
-    enc := gob.NewEncoder(&buf)
-    err := enc.Encode(content)
-    if err != nil {
-        return nil, err
-    }
-    return buf.Bytes(), nil
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(content)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func purge() {
@@ -1340,5 +1346,5 @@ func purge() {
 	for {
 		time.Sleep(duration)
 
-		}//loop forever
+	} //loop forever
 }
