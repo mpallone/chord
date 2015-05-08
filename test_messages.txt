@@ -1,6 +1,14 @@
 {"method":"Requested.Insert","params":[{ "Key":"key1", "Rel":"relA", "Val":{"content": "anyvalidJSONstring","size": "", "created": "","modified": "","accessed": "","permission": "RW"}}], "id":1}
 {"method":"Requested.Insert","params":[{ "Key":"key2", "Rel":"relA", "Val":{"content": "anyvalidJSONstring","size": "", "created": "","modified": "","accessed": "","permission": "RW"}}], "id":2}
 {"method":"Requested.Insert","params":[{ "Key":"key3", "Rel":"relA", "Val":{"content": "anyvalidJSONstring","size": "", "created": "","modified": "","accessed": "","permission": "RW"}}], "id":3}
-{"method":"Requested.Delete","params":[{ "Key":"key1", "Rel":"relA", "Val":{"content": "anyvalidJSONstring","size": "", "created": "","modified": "","accessed": "","permission": "RW"}}], "id":2}
+{"method":"Requested.Delete","params":[{ "Key":"key1", "Rel":"relA"}], "id":1}
+{"method":"Requested.Delete","params":[{ "Key":"key1", "Rel":"relA", "Val":{"content": "anyvalidJSONstring","size": "", "created": "","modified": "","accessed": "","permission": ""}}], "id":2}
+
+
+
+
+
+
+
 
 
