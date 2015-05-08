@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"time"
@@ -489,4 +490,26 @@ func Delay(delayString string) {
 	duration, _ := time.ParseDuration(delayString)
 	time.Sleep(duration)
 
+}
+
+func CheckPredecessor() {
+	duration, _ := time.ParseDuration("300s")
+	for {
+		time.Sleep(duration)
+
+		if Predecessor.IpAddress != "" {
+			service := Predecessor.IpAddress + ":" + Predecessor.Port
+			seconds := 30
+
+			//Check if predecessor has failed
+			_, err := net.DialTimeout("tcp", service, time.Duration(seconds)*time.Second)
+			if err != nil {
+				//Set predecessor to nil
+				fmt.Println("Failed to connect to predecessor", err)
+				Predecessor.ChordID = big.NewInt(0)
+				Predecessor.IpAddress = ""
+				Predecessor.Port = ""
+			}
+		}
+	}
 }

@@ -1173,6 +1173,7 @@ func main() {
 	go chord.FixFingers()
 	go n.sigHandler()
 	go purge()
+	go chord.CheckPredecessor()
 
 	for runListener {
 		listener.SetDeadline(time.Now().Add(time.Second))
