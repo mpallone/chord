@@ -637,7 +637,7 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 
 	fmt.Println("Insert RPC called with args:", args, "  reply:", reply)
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+
 	//create the key and relationship concatenated ID
 	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
 	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
@@ -754,15 +754,20 @@ func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 		// construct temp KeyRelPair
 		krp := KeyRelPair{args.Key, args.Rel}
 
-		//Calculate content size
-		size, err := getBytes(args.Val.Content)
-		if err != nil {
-			fmt.Println("Error Encoding Interface", err)
-			return err
-		}
+		//Initial value of content size
+		ContentSize := "0bytes"
 
-		//Convert size to string and append "bytes"
-		ContentSize := strconv.Itoa(len(size)) + "bytes"
+		//Check if contents is not empty
+		if args.Val.Content != nil {
+			//Calculate size of content
+			size, err := getBytes(args.Val.Content)
+			if err != nil {
+				fmt.Println("Error Encoding Interface", err)
+				return err
+			}
+			//Convert size to string and append "bytes"
+			ContentSize = strconv.Itoa(len(size)) + "bytes"
+		} //else content size is equal to its initial value "0bytes"
 
 		//Set the content size
 		args.Val.Size = ContentSize
@@ -838,23 +843,28 @@ func (t *Requested) Delete(args *Args, reply *DeleteReply) error {
 		//Check if the content is Read/Read-Write
 		//Delete can proceed if file is not Read only
 		for krp := range dict {
-			val := dict[krp]
-			fmt.Println("Permission: ", val.Permission)
-			if p := val.Permission; p == "R" {
-				//Read only: can not delete
-				fmt.Println("Read only: can not delete")
-				//Set TripletDeleted to false
-				reply.TripletDeleted = false
-			} else if p := val.Permission; p == "RW" {
-				delete(dict, krp)
-				fmt.Println(" ... Removing triplet permission (RW) from DICT3 and writing to disk.")
-				writeDictToDisk()
-				reply.TripletDeleted = true
-			} else {
-				//invalid permission
-				fmt.Println("Invalid Permission")
-				//Set TripletDeleted to false
-				reply.TripletDeleted = false
+			// construct temp KeyRelPair
+			argskrp := KeyRelPair{args.Key, args.Rel}
+
+			if krp == argskrp {
+				val := dict[krp]
+				fmt.Println("Permission: ", val.Permission)
+				if p := val.Permission; p == "R" {
+					//Read only: can not delete
+					fmt.Println("Read only: can not delete")
+					//Set TripletDeleted to false
+					reply.TripletDeleted = false
+				} else if p := val.Permission; p == "RW" {
+					delete(dict, krp)
+					fmt.Println(" ... Removing triplet permission (RW) from DICT3 and writing to disk.")
+					writeDictToDisk()
+					reply.TripletDeleted = true
+				} else {
+					//invalid permission
+					fmt.Println("Invalid Permission")
+					//Set TripletDeleted to false
+					reply.TripletDeleted = false
+				}
 			}
 		}
 	}
