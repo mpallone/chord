@@ -1172,6 +1172,7 @@ func main() {
 	go periodicallyStabilize()
 	go chord.FixFingers()
 	go n.sigHandler()
+	go purge()
 
 	for runListener {
 		listener.SetDeadline(time.Now().Add(time.Second))
@@ -1356,5 +1357,64 @@ func purge() {
 	for {
 		time.Sleep(duration)
 
+		//Get purge time from configuration file and convert to int64
+		purge_time, err := strconv.ParseInt(conf.PurgeSecondsAfter, 0, 64)
+		if err != nil {
+			fmt.Println("Error: Could not convert purge seconds to int64", err)
+		}
+
+		fmt.Println("Purge called. Purging key rel pairs after: ", purge_time, "seconds")
+
+		for krp, val := range dict {
+
+			//Get the access time
+			tempAssessedTime, err := time.Parse(longForm, val.Accessed)
+			if err != nil {
+				fmt.Println("Time format is wrong or access time is nil", err)
+			}
+
+			//Convert access time to seconds int64
+			accessTime := tempAssessedTime.Unix()
+			fmt.Println("AccessedTime: ", accessTime, "seconds")
+
+			//Get the modified time
+			tempModifiedTime, err := time.Parse(longForm, val.Modified)
+			if err != nil {
+				fmt.Println("Time format is wrong or access time is nil", err)
+			}
+
+			//Convert modified time to seconds int64
+			modifiedTime := tempModifiedTime.Unix()
+			fmt.Println("AccessedTime: ", modifiedTime, "seconds")
+
+			//Get the created time
+			tempCreatedTime, err := time.Parse(longForm, val.Created)
+			if err != nil {
+				fmt.Println("Time format is wrong or access time is nil", err)
+			}
+
+			//Convert created time to seconds int64
+			createdTime := tempCreatedTime.Unix()
+			fmt.Println("AccessedTime: ", createdTime, "seconds")
+
+			//Get the current time
+			tempCurrentTime := time.Now()
+
+			//Convert the current time to seconds int64
+			currentTime := tempCurrentTime.Unix()
+			fmt.Println("CurrentTime: ", currentTime, "seconds")
+
+			//Calculate the time difference
+			timeDiff1 := currentTime - accessTime
+			timeDiff2 := currentTime - modifiedTime
+			timeDiff3 := currentTime - createdTime
+
+			//If krp has not been accessed since some user specified time aka purge_time then delete
+			if timeDiff1 >= purge_time || timeDiff2 >= purge_time || timeDiff3 >= purge_time {
+				delete(dict, krp)
+				fmt.Println(" ... Removing triplet from DICT3 and writing to disk.")
+				writeDictToDisk()
+			}
+		}
 	} //loop forever
 }
