@@ -49,10 +49,10 @@ sleep 3
 echo "Starting client"
 case $out_mode in
     log)
-        client client.cfg
+        ${GOPATH}/bin/client client.cfg
         ;;
     null)
-        client client.cfg
+        ${GOPATH}/bin/client client.cfg
         ;;
     tmux)
         tmux new-window -n "CLIENT" "echo Press CTL-D to send; cat - $client_msgs - | ${GOPATH}/bin/client client.cfg;"
