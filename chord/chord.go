@@ -18,7 +18,7 @@ type ChordNodePtr struct {
 	Port      string
 }
 
-const MBits int = 8 // This *must* be an even number for key/rel hashing purposes
+const MBits int = 160 // This *must* be an even number for key/rel hashing purposes
 const SELF int = 0
 
 var Predecessor ChordNodePtr
@@ -163,12 +163,12 @@ func GetChordID(str string) *big.Int {
 	//fmt.Printf("SHA-1 hash: %x\n", sha1hash)
 
 	// use only last 1 byte (8 bits) (todo, don't forget to put this back to 160 or whatever)
-	var b = sha1hash[len(sha1hash)-1 : len(sha1hash)]
+	//var b = sha1hash[len(sha1hash)-2 : len(sha1hash)]
 	//fmt.Printf("Chord ID (hex): 0x%x\n", b)
 
 	// https://groups.google.com/forum/#!topic/golang-nuts/se5SRGw3kqQ
 	// for converting byte array into integer
-	var chordID = big.NewInt(0).SetBytes(b)
+	var chordID = big.NewInt(0).SetBytes(sha1hash[:])
 	//fmt.Printf("Chord ID (dec): %d\n", chordID)
 
 	return chordID

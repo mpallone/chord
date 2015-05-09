@@ -1259,10 +1259,10 @@ func periodicallyStabilize() {
 		chord.Stabilize()
 		deleteAnyTransferredKeys()
 
-		fmt.Println("Finger Table:")
-		for index, val := range chord.FingerTable {
-			fmt.Println(index, val)
-		}
+		//fmt.Println("Finger Table:")
+		//for index, val := range chord.FingerTable {
+		//	fmt.Println(index, val)
+		//}
 		fmt.Println("relOnlyPartialMatchQueryCount", relOnlyPartialMatchQueryCount)
 
 		//fmt.Println("periodicallyStabilize(), predecess:", chord.Predecessor)
