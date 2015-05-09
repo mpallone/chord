@@ -244,7 +244,8 @@ func checkFingerTables(nodeStates []ChordNodeState) bool {
 	//Arrange into ring
 	ids := make([]big.Int, len(nodeStates))
 	for i := 0; i < len(nodeStates); i++ {
-		ids[i] = *nodeStates[i].FingerTable[i].ChordID
+		// ids[i] = *nodeStates[i].FingerTable[i].ChordID
+		ids[i] = *nodeStates[i].FingerTable[0].ChordID
 	}
 
 	//Generate the correct finger tables
@@ -255,15 +256,23 @@ func checkFingerTables(nodeStates []ChordNodeState) bool {
 		for b := 1; b < chord.MBits+1; b++ {
 			base := big.NewInt(2)
 			exponent := big.NewInt(int64(b - 1))
-			ringSize := new(big.Int).Exp(base, big.NewInt(int64(chord.MBits)), nil)
 			lookupKey := new(big.Int).Add(&ids[i], new(big.Int).Exp(base, exponent, nil))
 			lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(chord.MBits)), nil))
-			var j int
-			for j = i + 1; lookupKey.Cmp(&ids[j]) != 1 && lookupKey.Cmp(new(big.Int).Add(&ids[j], ringSize)) != 1 && j != i; j = (j + 1) % len(ids) {
-				expectedStates[i][b] = ids[j]
-			}
-			if j == i { //Successor does not exist???
-				return false
+
+			// Populate expectedStates with the correct ChordID
+
+			for indexOfStartNode := 0; indexOfStartNode < len(ids); indexOfStartNode++ {
+				indexOfStopNode := indexOfStartNode + 1
+				if indexOfStopNode == len(ids) {
+					indexOfStopNode = 0 // Wrap around the ring.
+				}
+
+				startNodeId := ids[indexOfStartNode]
+				stopNodeId := ids[indexOfStopNode]
+
+				if chord.Inclusive_in(lookupKey, chord.AddOne(&startNodeId), &stopNodeId) {
+					expectedStates[i][b] = stopNodeId
+				}
 			}
 		}
 	}
