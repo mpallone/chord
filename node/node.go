@@ -1253,7 +1253,7 @@ func join(existingNodeIpAddress string, existingNodePort string) {
 
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
-	duration, _ := time.ParseDuration("3s")
+	duration, _ := time.ParseDuration(".150s")
 	for chord.RunStabilize {
 		time.Sleep(duration)
 		chord.Stabilize()
