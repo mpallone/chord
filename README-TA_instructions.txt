@@ -1,5 +1,5 @@
 I. To run large network with output to logfile
--25 nodes w/ 1000 triplets inserted; all nodes then gracefully exit and transfer keys
+-100 nodes w/ 1000 triplets inserted; all nodes then gracefully exit and transfer keys
 
 # STEP 1)
 # Compile, generate configuration files, and execute CHORD ring with 100 nodes, 1000 keys, and purge time of 600 seconds
