@@ -14,6 +14,7 @@ shift
 shift
 
 log=/tmp/bestchordever.log
+echo > $log
 
 #Figure out which configs to use
 cd $config_dir
@@ -49,10 +50,10 @@ sleep 3
 echo "Starting client"
 case $out_mode in
     log)
-        ${GOPATH}/bin/client client.cfg
+        cat - $client_msgs - | ${GOPATH}/bin/client client.cfg
         ;;
     null)
-        ${GOPATH}/bin/client client.cfg
+        cat - $client_msgs - | ${GOPATH}/bin/client client.cfg
         ;;
     tmux)
         tmux new-window -n "CLIENT" "echo Press CTL-D to send; cat - $client_msgs - | ${GOPATH}/bin/client client.cfg;"
