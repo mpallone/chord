@@ -56,8 +56,11 @@ func main() {
 	fmt.Println("JSON messages entered must:")
 	fmt.Println(` -specify Requested.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
-	fmt.Println(`Example: {"method":"Requested.Insert","params":[{ "Key":"keyA", "Rel":"relA", "Val":{"a":5, "b":6} }], "id":85}`)
-	fmt.Println(`{"method":"Requested.Shutdown","params":[], "id":95}`) // todo remove, this is just for convenience
+	fmt.Println(`Example: {"method":"Requested.Insert", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`)
+	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`) 
+	fmt.Println(`{"method":"Requested.InsertOrUpdate", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`) 
+	fmt.Println(`{"method":"Requested.ListKeys","params":[], "id":95}`)
+	fmt.Println(`{"method":"Requested.Shutdown","params":[], "id":95}`) 
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
