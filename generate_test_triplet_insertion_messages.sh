@@ -13,8 +13,7 @@ BEFORE_KEY='{"method":"Requested.Insert", "params":[{ "Key":"'
 MIDDLE_KEY1='", "Rel":"relA", "Val":{"content":{"someJSONobject'
 MIDDLE_KEY2='":'
 MIDDLE_KEY3='}, "permission":"'
-MIDDLE_KEY4='"} }], "id":'
-AFTER_KEY='}'
+AFTER_KEY='"} }] }'
 
 msgs=""
 
@@ -29,8 +28,6 @@ for ((i=1; i<=${NUM_TRIPLETS}; i++)); do
 	msgs+=$i
 	msgs+=${MIDDLE_KEY3}
 	msgs+=$READ_OR_READWRITE
-	msgs+=${MIDDLE_KEY4}
-	msgs+=$i
 	msgs+=$AFTER_KEY
 	echo "${msgs}" >> ${TESTDATA_FILE} 
 done
