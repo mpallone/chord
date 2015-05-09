@@ -963,7 +963,7 @@ func (t *Requested) Shutdown(args *Args, reply *string) error {
 	fmt.Println("***Preparing to shut down. Transferring my keys to my successor...")
 
 	//Leave the network and update the others
-	chord.RunStabilize = false
+	chord.RunStabilizeAndFixFingers = false
 	runListener = false
 	for !chord.FFDone || !stabilizeDone || !listenerDone {
 		time.Sleep(time.Millisecond)
@@ -1121,6 +1121,7 @@ func (t *Requested) TransferInsert(args *Args, reply *InsertReply) error {
 		fmt.Println(" ... Triplet already exists in DICT3.")
 		reply.TripletInserted = false
 	}
+	fmt.Println("End of TransferInsert, receiving node has this many keys:", len(dict))
 	return nil
 }
 
@@ -1261,7 +1262,7 @@ func join(existingNodeIpAddress string, existingNodePort string) {
 func periodicallyStabilize() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration(".150s")
-	for chord.RunStabilize {
+	for chord.RunStabilizeAndFixFingers {
 		time.Sleep(duration)
 		chord.Stabilize()
 		deleteAnyTransferredKeys()

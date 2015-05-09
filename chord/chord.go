@@ -27,7 +27,7 @@ var FingerTable [MBits + 1]ChordNodePtr
 
 var connections = make(map[string]*rpc.Client)
 
-var RunStabilize = true
+var RunStabilizeAndFixFingers = true
 var FFDone = false
 
 type FindSuccessorReply struct {
@@ -458,7 +458,7 @@ func FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("0.2s")
 	next := 0
-	for RunStabilize {
+	for RunStabilizeAndFixFingers {
 		time.Sleep(duration)
 		next += 1
 		if next > MBits {
