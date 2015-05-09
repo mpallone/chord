@@ -29,7 +29,6 @@ type ClientConfiguration struct {
 type RPCCall struct {
 	Method string
 	Params []interface{}
-	Id     int64
 }
 
 func main() {
@@ -56,16 +55,16 @@ func main() {
 	fmt.Println("JSON messages entered must:")
 	fmt.Println(` -specify Requested.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
-	fmt.Println(`Example: {"method":"Requested.Insert", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`)
-	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`) 
-	fmt.Println(`{"method":"Requested.InsertOrUpdate", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }], "id":1}`) 
-	fmt.Println(`{"method":"Requested.ListKeys","params":[], "id":95}`)
-	fmt.Println(`{"method":"Requested.Shutdown","params":[], "id":95}`) 
-	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":"relA"}], "id":85}`)
-	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key0", "Rel":" "}], "id":85}`)
-	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":" ", "Rel":"relA"}], "id":85}`)
-	fmt.Println(`{"method":"Requested.DetermineIfNetworkIsStable","params":[{}], "id":85}`)
-	fmt.Println(`{"method":"Requested.DetermineNetworkStructure","params":[{}], "id":85}`)
+	fmt.Println(`Example: {"method":"Requested.Insert", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
+	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`) 
+	fmt.Println(`{"method":"Requested.InsertOrUpdate", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`) 
+	fmt.Println(`{"method":"Requested.ListKeys","params":[{}]}`)
+	fmt.Println(`{"method":"Requested.Shutdown","params":[{}]}`) 
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":"relA"}]}`)
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":" "}]}`)
+	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":" ", "Rel":"relA"}]}`)
+	fmt.Println(`{"method":"Requested.DetermineIfNetworkIsStable","params":[{}]}`)
+	fmt.Println(`{"method":"Requested.DetermineNetworkStructure","params":[{}]}`)
 	fmt.Println("===============================================================================================================")
 	rdr := bufio.NewReader(os.Stdin)
 
