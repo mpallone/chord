@@ -48,6 +48,9 @@ sleep 3
 
 echo "Starting client"
 case $out_mode in
+    log)
+        client client.cfg
+        ;;
     null)
         client client.cfg
         ;;
