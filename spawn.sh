@@ -2,7 +2,7 @@
 
 if [[ $# < 3 ]]; then
     echo Usage: $0 "<out_mode> <config_dir> <client_messages> [instancenum.config instancenum.config...]"
-    echo out_mode must be \"gnome-terminal\", \"tmux\", or \"null\"
+    echo out_mode must be \"gnome-terminal\", \"tmux\", \"log\", or \"null\"
     exit 1
 fi
 
@@ -12,6 +12,8 @@ client_msgs=`readlink -f $3`
 shift
 shift
 shift
+
+log=/tmp/bestchordever.log
 
 #Figure out which configs to use
 cd $config_dir
@@ -26,13 +28,17 @@ for c in $configs; do
     echo Loading $c
     case $out_mode in
         null)
-            node $c &>/dev/null&
+            ${GOPATH}/bin/node $c &>/dev/null&
+            ;;
+    	log)
+            echo Logging to $log
+	    ${GOPATH}/bin/node $c 2>&1 | sed "s,^,$c: ,g" --unbuffered >> $log&
             ;;
         tmux)
             tmux new-window -n $c "${GOPATH}/bin/node $c; cat -"
             ;;
         gnome-terminal)
-	        gnome-terminal  -e "${GOPATH}/bin/node $c" --window-with-profile=HOLD_OPEN --title="$c"
+	    gnome-terminal  -e "${GOPATH}/bin/node $c" --window-with-profile=HOLD_OPEN --title="$c"
             ;;
     esac
 done
