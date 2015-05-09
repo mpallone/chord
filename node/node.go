@@ -1011,6 +1011,13 @@ func (t *Requested) Shutdown(args *Args, reply *string) error {
 
 	fmt.Println("***Closing persistent connections.")
 	chord.ClosePersistentConnections()
+
+	fmt.Println("***Deleting persistent storage, since keys have been transferred.")
+	err = os.Remove(conf.PersistentStorageContainer.File)
+	if err != nil {
+		fmt.Println("Error deleting persistent storage container file when shutting down:", err)
+	}
+
 	shutdownDone = true
 	return nil
 }
