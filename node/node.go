@@ -117,6 +117,10 @@ type LookupReply struct {
 type InsertReply struct {
 	TripletInserted bool
 }
+type ListKeysArgs struct {
+	KeyList  []TripKey
+	ChordIDs []*big.Int
+}
 type ListKeysReply struct {
 	KeyList []TripKey
 }
@@ -946,9 +950,18 @@ func (t *Requested) Delete(args *Args, reply *DeleteReply) error {
 }
 
 // LISTKEYS()
-func (t *Requested) ListKeys(args *Args, reply *ListKeysReply) error {
+func (t *Requested) ListKeys(args *ListKeysArgs, reply *ListKeysReply) error {
 
-	fmt.Println("  ListKeys ")
+	fmt.Println("  *********************************  ListKeys  ******************************** ")
+
+	for _, chordID := range args.ChordIDs {
+		if chord.FingerTable[chord.SELF].ChordID.Cmp(chordID) == 0 {
+			reply.KeyList = args.KeyList
+			return nil
+		}
+	}
+
+	args.ChordIDs = append(args.ChordIDs, chord.FingerTable[chord.SELF].ChordID)
 
 	// use map as a set of unique keys
 	var uniqueKeys = make(map[TripKey]bool)
@@ -961,7 +974,10 @@ func (t *Requested) ListKeys(args *Args, reply *ListKeysReply) error {
 			result = append(result, krp.Key)
 		}
 	}
-	reply.KeyList = result
+	args.KeyList = append(args.KeyList, result...)
+
+	chord.CallRPC("Requested.ListKeys", &args, &reply, &chord.FingerTable[1])
+
 	return nil
 }
 
@@ -976,6 +992,7 @@ func (t *Requested) ListIDs(args *Args, reply *ListIDsReply) error {
 	}
 	reply.IDList = ids
 	return nil
+
 }
 
 // SHUTDOWN()
