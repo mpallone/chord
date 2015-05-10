@@ -129,8 +129,11 @@ type DeleteReply struct {
 
 // Structs used for testing /////////////////////
 type ChordNodeState struct {
-	FingerTable [chord.MBits + 1]chord.ChordNodePtr
-	NumKeys     int
+	FingerTable                           [chord.MBits + 1]chord.ChordNodePtr
+	NumKeys                               int
+	MinKey                                *big.Int
+	MaxKey                                *big.Int
+	AllMyKeysAreBetweenMyPredecessorAndMe bool
 }
 type DetermineNetworkStructureArgs struct {
 	NodeStates []ChordNodeState
@@ -138,6 +141,7 @@ type DetermineNetworkStructureArgs struct {
 type DetermineNetworkStructureReply struct {
 	NodeStates                []ChordNodeState
 	AllFingerTablesAreCorrect bool
+	AllKeysAreInTheRightPlace bool
 }
 
 type IsNetworkStableArgs struct {
@@ -231,6 +235,13 @@ func (t *Requested) DetermineNetworkStructure(args *DetermineNetworkStructureArg
 				fmt.Println("DetermineNetworkStructure: detected duplicate node that's not at the beginning of the list => network is not stable")
 			}
 			reply.AllFingerTablesAreCorrect = checkFingerTables(args.NodeStates)
+			reply.AllKeysAreInTheRightPlace = true
+			for _, nodeState := range args.NodeStates {
+				if !nodeState.AllMyKeysAreBetweenMyPredecessorAndMe {
+					reply.AllKeysAreInTheRightPlace = false
+					break
+				}
+			}
 			reply.NodeStates = args.NodeStates
 			return nil
 		}
@@ -241,6 +252,37 @@ func (t *Requested) DetermineNetworkStructure(args *DetermineNetworkStructureArg
 	for i := 0; i < chord.MBits+1; i++ {
 		myState.FingerTable[i] = chord.FingerTable[i]
 	}
+
+	// Populate the min key and max key entries
+	var minKey *big.Int
+	var maxKey *big.Int
+	initialized := false
+	if len(dict) > 0 {
+		for keyRelPair, _ := range dict {
+			currentId := getDict3ChordKey(string(keyRelPair.Key), string(keyRelPair.Rel))
+			if !initialized {
+				minKey = currentId
+				maxKey = currentId
+				initialized = true
+			} else {
+
+				if currentId.Cmp(minKey) < 0 {
+					minKey = currentId
+				}
+
+				if currentId.Cmp(maxKey) > 0 {
+					maxKey = currentId
+				}
+			}
+		}
+		minKeyIsInTheRightPlace := chord.Inclusive_in(minKey, chord.AddOne(chord.Predecessor.ChordID), chord.FingerTable[0].ChordID)
+		maxKeyIsInTheRightPlace := chord.Inclusive_in(minKey, chord.AddOne(chord.Predecessor.ChordID), chord.FingerTable[0].ChordID)
+		myState.AllMyKeysAreBetweenMyPredecessorAndMe = minKeyIsInTheRightPlace && maxKeyIsInTheRightPlace
+	} else {
+		myState.AllMyKeysAreBetweenMyPredecessorAndMe = true // idgaf
+	}
+	myState.MinKey = minKey
+	myState.MaxKey = maxKey
 
 	args.NodeStates = append(args.NodeStates, myState)
 
