@@ -24,6 +24,7 @@ else
     configs="$@"
 fi
 
+set -m
 if [[ $out_mode == tmux ]]; then tmux new-session -d 'bash'; fi
 for c in $configs; do
     echo Loading $c
@@ -43,6 +44,7 @@ for c in $configs; do
             ;;
     esac
 done
+set +m
 
 # pause for a few seconds until all servers are up and listening
 sleep 3
