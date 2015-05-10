@@ -124,6 +124,10 @@ type ListKeysArgs struct {
 type ListKeysReply struct {
 	KeyList []TripKey
 }
+type ListIDsArgs struct {
+	IDList   []KeyRelPair
+	ChordIDs []*big.Int
+}
 type ListIDsReply struct {
 	IDList []KeyRelPair
 }
@@ -982,15 +986,27 @@ func (t *Requested) ListKeys(args *ListKeysArgs, reply *ListKeysReply) error {
 }
 
 // LISTIDs()
-func (t *Requested) ListIDs(args *Args, reply *ListIDsReply) error {
+func (t *Requested) ListIDs(args *ListIDsArgs, reply *ListIDsReply) error {
 
 	fmt.Println("  ListIDs")
+
+	for _, chordID := range args.ChordIDs {
+		if chord.FingerTable[chord.SELF].ChordID.Cmp(chordID) == 0 {
+			reply.IDList = args.IDList
+			return nil
+		}
+	}
+
+	args.ChordIDs = append(args.ChordIDs, chord.FingerTable[chord.SELF].ChordID)
 
 	var ids []KeyRelPair
 	for krp, _ := range dict {
 		ids = append(ids, krp)
 	}
-	reply.IDList = ids
+	args.IDList = append(args.IDList, ids...)
+
+	chord.CallRPC("Requested.ListIDs", &args, &reply, &chord.FingerTable[1])
+
 	return nil
 
 }

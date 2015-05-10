@@ -59,6 +59,7 @@ func main() {
 	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
 	fmt.Println(`{"method":"Requested.InsertOrUpdate", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
 	fmt.Println(`{"method":"Requested.ListKeys","params":[{}]}`)
+	fmt.Println(`{"method":"Requested.ListIDs","params":[{}]}`)
 	fmt.Println(`{"method":"Requested.Shutdown","params":[{}]}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":"relA"}]}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":" "}]}`)
