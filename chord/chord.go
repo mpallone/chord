@@ -98,8 +98,6 @@ func ClosePersistentConnections() {
 // stopKey may be less than startKey, in which case this function will
 // assume that we've "looped" over the top of the ring.
 //
-// todo - I made this capitalized for testing, but it should probably just
-// be an internal method
 func Inclusive_in(searchKey *big.Int, startKey *big.Int, stopKey *big.Int) bool {
 
 	greaterThanOrEqualToStartKey := searchKey.Cmp(startKey) >= 0
@@ -162,7 +160,7 @@ func GetChordID(str string) *big.Int {
 	sha1hash := sha1.Sum(data)
 	//fmt.Printf("SHA-1 hash: %x\n", sha1hash)
 
-	// use only last 1 byte (8 bits) (todo, don't forget to put this back to 160 or whatever)
+	// use only last 1 byte (8 bits)
 	//var b = sha1hash[len(sha1hash)-2 : len(sha1hash)]
 	//fmt.Printf("Chord ID (hex): 0x%x\n", b)
 
@@ -209,19 +207,13 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 	chordNodePtrToExistingNode.ChordID = GetChordID(existingNodeIP + ":" + existingNodePort)
 
 	for CallRPC("Requested.FindSuccessor", &args, &findSuccessorReply, &chordNodePtrToExistingNode) != nil {
-		//fmt.Println("FindSuccessor() call in Join failed, trying again after a short Delay...")
 		Delay("3s")
 	}
 
 	// Set our fingers to point to the successor.
-	// todo - I think it's actually better to just copy the successors finger table,
-	//        but I don't feel like implementing that right now, and stabilize() and
-	//        fix_fingers() should result in correct finger tables eventually.
 	FingerTable[1].IpAddress = findSuccessorReply.ChordNodePtr.IpAddress
 	FingerTable[1].Port = findSuccessorReply.ChordNodePtr.Port
 	FingerTable[1].ChordID = findSuccessorReply.ChordNodePtr.ChordID
-
-	//fmt.Println("Finger table at the end of Join():", FingerTable)
 
 	// call TransferKeys on the node that we just discovered is our new successor
 	//   we need to tell the new successor about ourself (IP, Port, and ChordID) so it
@@ -255,13 +247,6 @@ func Join(existingNodeIP string, existingNodePort string, myIp string, myPort st
 //
 func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr *ChordNodePtr) error {
 
-	//fmt.Println("-------------------------------------------------------")
-	//fmt.Println("CallRPC() has been called with the following arguments:")
-	//fmt.Println("rpcString:", rpcString)
-	//fmt.Println("args:", args)
-	//fmt.Println("reply:", reply)
-	//fmt.Println("chordNodePtr:", chordNodePtr)
-
 	// Just to test that my function signature syntax is correct:
 	service := chordNodePtr.IpAddress + ":" + chordNodePtr.Port
 	var client *rpc.Client
@@ -270,11 +255,8 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	client = connections[service]
 	if client != nil {
-		//fmt.Println("client isn't nil, attempting to Call it")
 		err = client.Call(rpcString, args, reply)
 		if err != nil {
-			//fmt.Println("CallRPC() tried to call an existing client, but failed. Attempting to reestablish connection in order to call:", rpcString)
-			//fmt.Println("error received was:", err)
 			callFailed = true
 		} else {
 			return nil
@@ -283,19 +265,14 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	if client == nil || callFailed {
 
-		//fmt.Println("client is nil or the original call failed, attempting to establish a new connection")
-
 		client, err = jsonrpc.Dial("tcp", service)
 		if err != nil {
-			//fmt.Println("CallRPC ERROR;", rpcString, "failed to connect to", chordNodePtr, "with error", err)
 			return err
 		}
 
 		// Only maintain a persistent connection if the node we're contacting is
 		// in our finger table, or if it's our predecessor.
 
-		// todo - if we implement 'r' predecessors and successors, this code might need
-		// to be updated to maintain persistent connections to them, too.
 		if isFingerOrPredecessor(chordNodePtr) || aFingerOrPredecessorIsNil() {
 			connections[service] = client
 		} else {
@@ -305,12 +282,8 @@ func CallRPC(rpcString string, args interface{}, reply interface{}, chordNodePtr
 
 	err = client.Call(rpcString, args, reply)
 	if err != nil {
-		//fmt.Println("CallRPC ERROR;", rpcString, "received an error when calling the", rpcString, "RPC:", err)
 		return err
 	}
-
-	//fmt.Println("CallRPC() has populated the reply with:", reply)
-	//fmt.Println("------------------------------------------------------")
 
 	return nil
 }
@@ -368,11 +341,8 @@ func ChordNodePtrsAreEqual(ptr1 *ChordNodePtr, ptr2 *ChordNodePtr) bool {
 
 func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 
-	//fmt.Println("finding successor of: ", id)
-
 	if id == nil {
-		//fmt.Println("ERROR: FindSuccessor was called with a <nil> id.") // todo remove duplicate string
-		Delay("10s") // todo remove
+		Delay("10s")
 		return ChordNodePtr{}, errors.New("FindSuccessor was called with a <nil> id.")
 	}
 
@@ -381,16 +351,6 @@ func FindSuccessor(id *big.Int) (ChordNodePtr, error) {
 	}
 
 	closestPrecedingFinger := closestPrecedingNode(id)
-
-	// TODO If *I* am the closest preceding node at this point, that means the initial Inclusive_in check
-	// at the top of this function didn't work, and also that our finger table isn't yet correct. So,
-	// ask our successor to find the node for us in this case.
-	if closestPrecedingFinger.ChordID == FingerTable[0].ChordID {
-		fmt.Println("FINDSUCCESSOR!! THIS SHOULD NEVER HAPPEN!!! DELETE ME??")
-		//closestPrecedingFinger = FingerTable[1]
-	}
-
-	//fmt.Println("FindSuccessor() chose the following for closestPrecedingFinger:", closestPrecedingFinger)
 
 	var findSuccessorReply FindSuccessorReply
 	var args ChordIDArgs
@@ -453,7 +413,6 @@ func Stabilize() {
 	CallRPC("Requested.Notify", &notifyArgs, &reply, &FingerTable[1])
 }
 
-// todo - should FixFingers() and Stablize() be called consistently? I'm doing them kind of wonky here
 func FixFingers() {
 	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("0.2s")
@@ -470,16 +429,12 @@ func FixFingers() {
 		lookupKey := new(big.Int).Add(FingerTable[SELF].ChordID, new(big.Int).Exp(base, exponent, nil))
 		lookupKey = new(big.Int).Mod(lookupKey, new(big.Int).Exp(base, big.NewInt(int64(MBits)), nil))
 
-		//fmt.Println("\nFixFingers() is looking up:", lookupKey, "for next =", next)
 		successor, err := FindSuccessor(lookupKey)
 		if err != nil {
 			return
 		}
-		//fmt.Println("result:", successor)
 
 		FingerTable[next] = successor
-
-		//fmt.Println("\nFixFingers():", FingerTable)
 	}
 	FFDone = true
 }
