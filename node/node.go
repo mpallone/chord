@@ -745,11 +745,12 @@ func (t *Requested) NaiveLookup(args *NaiveLookupArgs, reply *LookupReply) error
 		}
 	}
 
+	args.ChordIDs = append(args.ChordIDs, chord.FingerTable[chord.SELF].ChordID)
+
 	if len(tripletKey) != 0 && len(tripletRel) != 0 {
 
 		fmt.Println(" *** Performing a normal naive lookup on ", tripletKey, tripletRel)
 
-		// DON'T PROPAGATE AROUND THE RING IF WE FIND THE KEY
 		for keyRelPair, _ := range dict {
 			if keyRelPair.Rel == args.Rel && keyRelPair.Key == args.Key {
 				var currTriplet Triplet
@@ -761,13 +762,43 @@ func (t *Requested) NaiveLookup(args *NaiveLookupArgs, reply *LookupReply) error
 			}
 		}
 
+		// Keep searching around the ring if we haven't found the triplet yet,
+		// and if this is the first time this node has been visited.
+		if len(args.TripList) == 0 {
+			chord.CallRPC("Requested.NaiveLookup", &args, &reply, &chord.FingerTable[1])
+		}
+
 	} else if len(tripletKey) != 0 && len(tripletRel) == 0 {
 
 		fmt.Println(" *** Performing a naive key-only partial match on ", tripletKey)
+		for keyRelPair, _ := range dict {
+			if keyRelPair.Key == args.Key {
+				var currTriplet Triplet
+				currTriplet.Key = keyRelPair.Key
+				currTriplet.Rel = keyRelPair.Rel
+				currTriplet.Val = dict[keyRelPair]
+				args.TripList = append(args.TripList, currTriplet)
+			}
+		}
+
+		chord.CallRPC("Requested.NaiveLookup", &args, &reply, &chord.FingerTable[1])
 
 	} else if len(tripletKey) == 0 && len(tripletRel) != 0 {
 
 		fmt.Println(" *** Performing a naive rel-only partial match on ", tripletRel)
+
+		for keyRelPair, _ := range dict {
+			if keyRelPair.Rel == args.Rel {
+				var currTriplet Triplet
+				currTriplet.Key = keyRelPair.Key
+				currTriplet.Rel = keyRelPair.Rel
+				currTriplet.Val = dict[keyRelPair]
+				args.TripList = append(args.TripList, currTriplet)
+				reply.TripList = args.TripList
+			}
+		}
+
+		chord.CallRPC("Requested.NaiveLookup", &args, &reply, &chord.FingerTable[1])
 
 	} else {
 

@@ -64,6 +64,10 @@ func main() {
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":"relA"}]}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":"key1", "Rel":" "}]}`)
 	fmt.Println(`{"method":"Requested.Lookup","params":[{ "Key":" ", "Rel":"relA"}]}`)
+	// For Mark's convenience when copying and pasting
+	// fmt.Println(`{"method":"Requested.NaiveLookup","params":[{ "Key":"key1", "Rel":"relA"}]}`)
+	// fmt.Println(`{"method":"Requested.NaiveLookup","params":[{ "Key":"key1", "Rel":" "}]}`)
+	// fmt.Println(`{"method":"Requested.NaiveLookup","params":[{ "Key":" ", "Rel":"relA"}]}`)
 	fmt.Println(`{"method":"Requested.DetermineIfNetworkIsStable","params":[{}]}`)
 	fmt.Println(`{"method":"Requested.DetermineNetworkStructure","params":[{}]}`)
 	fmt.Println("===============================================================================================================")
