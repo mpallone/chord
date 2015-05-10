@@ -414,7 +414,6 @@ func Stabilize() {
 }
 
 func FixFingers() {
-	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration("0.2s")
 	next := 0
 	for RunStabilizeAndFixFingers {

@@ -114,6 +114,12 @@ type LookupReply struct {
 	// Val TripKeyRelValue
 	TripList []Triplet
 }
+type NaiveLookupArgs struct {
+	ChordIDs []*big.Int
+	TripList []Triplet
+	Key      TripKey
+	Rel      TripRel
+}
 type InsertReply struct {
 	TripletInserted bool
 }
@@ -717,6 +723,60 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 	return nil
 }
 
+// NAIVELOOKUP(keyA, relationA)
+//
+// Lookup that just searches all nodes in the network sequentially. This RPC only
+// exists so that we can see how much more efficient our actual partial match query
+// implementations are
+//
+func (t *Requested) NaiveLookup(args *NaiveLookupArgs, reply *LookupReply) error {
+
+	fmt.Print("  NaiveLookup:    ", args.Key, ", ", args.Rel)
+
+	// Remove any leading or trailing whitespace:
+	tripletKey := strings.TrimSpace(string(args.Key))
+	tripletRel := strings.TrimSpace(string(args.Rel))
+
+	// Stop searching when this node has been visited twice
+	for _, chordID := range args.ChordIDs {
+		if chordID.Cmp(chord.FingerTable[chord.SELF].ChordID) == 0 {
+			reply.TripList = args.TripList
+			return nil
+		}
+	}
+
+	if len(tripletKey) != 0 && len(tripletRel) != 0 {
+
+		fmt.Println(" *** Performing a normal naive lookup on ", tripletKey, tripletRel)
+
+		// DON'T PROPAGATE AROUND THE RING IF WE FIND THE KEY
+		for keyRelPair, _ := range dict {
+			if keyRelPair.Rel == args.Rel && keyRelPair.Key == args.Key {
+				var currTriplet Triplet
+				currTriplet.Key = keyRelPair.Key
+				currTriplet.Rel = keyRelPair.Rel
+				currTriplet.Val = dict[keyRelPair]
+				args.TripList = append(args.TripList, currTriplet)
+				reply.TripList = args.TripList
+			}
+		}
+
+	} else if len(tripletKey) != 0 && len(tripletRel) == 0 {
+
+		fmt.Println(" *** Performing a naive key-only partial match on ", tripletKey)
+
+	} else if len(tripletKey) == 0 && len(tripletRel) != 0 {
+
+		fmt.Println(" *** Performing a naive rel-only partial match on ", tripletRel)
+
+	} else {
+
+		fmt.Println(" *** Lookup RPC called with invalid args:", args)
+	}
+
+	return nil
+}
+
 // INSERT(keyA, relationA, valA)
 func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 
@@ -807,7 +867,8 @@ func (t *Requested) Insert(args *Args, reply *InsertReply) error {
 func (t *Requested) InsertOrUpdate(args *Args, reply *string) error {
 
 	//create the key and relationship concatenated ID
-	keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	// keyRelID := chord.GetChordID(string(args.Key) + string(args.Rel))
+	keyRelID := getDict3ChordKey(string(args.Key), string(args.Rel))
 
 	//Find the successor of the KeyRelID
 	keyRelSuccessor, err := chord.FindSuccessor(keyRelID)
@@ -1312,14 +1373,13 @@ func join(existingNodeIpAddress string, existingNodePort string) {
 }
 
 func periodicallyStabilize() {
-	// todo - this, and other methods, should probably be using RWLock.
 	duration, _ := time.ParseDuration(".150s")
 	for chord.RunStabilizeAndFixFingers {
 		time.Sleep(duration)
 		chord.Stabilize()
 		deleteAnyTransferredKeys()
 
-		fmt.Println("relOnlyPartialMatchQueryCount", relOnlyPartialMatchQueryCount)
+		// fmt.Println("relOnlyPartialMatchQueryCount", relOnlyPartialMatchQueryCount)
 	}
 	stabilizeDone = true
 }
@@ -1328,7 +1388,7 @@ func periodicallyStabilize() {
 // any Triplets that might need to be deleted because they were just copied as part of
 // a call to TransferKeys().  Any keys found to belong to the predecessor are deleted
 func deleteAnyTransferredKeys() error {
-	fmt.Println("Stabilize completed - Now checking if I need to delete any duplicate keys that may have been transferred")
+	// fmt.Println("Stabilize completed - Now checking if I need to delete any duplicate keys that may have been transferred")
 
 	// ensure stabilize has completed and a predecessor exists, otherwise null pointer dereference
 	if chord.Predecessor.ChordID != nil {
@@ -1368,20 +1428,20 @@ func deleteAnyTransferredKeys() error {
 		}
 	}
 
-	// -- DEBUG REMOVE
-	var numKeys int = 0
-	fmt.Printf("Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
-	fmt.Println("DICT3 contents are now: ")
-	for k, v := range dict {
-		// var chordKey = string(k.Key) + string(k.Rel)
-		// fmt.Printf(" (%d)", chord.GetChordID(chordKey))
-		fmt.Printf(" (%d)", getDict3ChordKey(string(k.Key), string(k.Rel)))
-		fmt.Println("  ", k, v)
-		numKeys++
-	}
-	fmt.Println("Total triplets: ", numKeys)
-	fmt.Println("------------------------")
-	// -- DEBUG REMOVE
+	// // -- DEBUG REMOVE
+	// var numKeys int = 0
+	// fmt.Printf("Node ID: %d\n", chord.GetChordID(conf.IpAddress+":"+conf.Port))
+	// fmt.Println("DICT3 contents are now: ")
+	// for k, v := range dict {
+	// 	// var chordKey = string(k.Key) + string(k.Rel)
+	// 	// fmt.Printf(" (%d)", chord.GetChordID(chordKey))
+	// 	fmt.Printf(" (%d)", getDict3ChordKey(string(k.Key), string(k.Rel)))
+	// 	fmt.Println("  ", k, v)
+	// 	numKeys++
+	// }
+	// fmt.Println("Total triplets: ", numKeys)
+	// fmt.Println("------------------------")
+	// // -- DEBUG REMOVE
 
 	return nil
 }
@@ -1441,7 +1501,7 @@ func checkErrorCondition(err error) {
 
 func (t *Requested) sigHandler() {
 	c := make(chan os.Signal)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGKILL)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP)
 	<-c
 	t.Shutdown(nil, nil)
 }
