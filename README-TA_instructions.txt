@@ -10,6 +10,7 @@ add the following lines at the end of .bashrc to set environment variables:
 
 mkdir -p $HOME/go/src/github.com/robcs621/
 
+# $PROJ2 = name of submitted project file
 tar -C $HOME/go/src/github.com/robcs621 -xzvf $PROJ2.tar.gz
 
 cd $HOME/go/src/github.com/robcs621/proj2/
