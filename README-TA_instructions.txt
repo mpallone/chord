@@ -10,10 +10,7 @@ add the following lines at the end of .bashrc to set environment variables:
 
 mkdir -p $HOME/go/src/github.com/robcs621/
 
-cd $HOME/go/src/github.com/robcs621/
-
-# untar submitted .tar.gz file in this directory
-tar -xzvf $PROJ2.tar.gz
+tar -C $HOME/go/src/github.com/robcs621 -xzvf $PROJ2.tar.gz
 
 cd $HOME/go/src/github.com/robcs621/proj2/
 
