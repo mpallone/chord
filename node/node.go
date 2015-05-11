@@ -628,6 +628,8 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 
 	fmt.Print("  Lookup:    ", args.Key, ", ", args.Rel)
 
+	startTime := time.Now()
+
 	// Remove any leading or trailing whitespace:
 	tripletKey := strings.TrimSpace(string(args.Key))
 	tripletRel := strings.TrimSpace(string(args.Rel))
@@ -720,6 +722,9 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 		fmt.Println(" *** Lookup RPC called with invalid args:", args)
 	}
 
+	elapsed := time.Since(startTime)
+	fmt.Println("Lookup run time:", elapsed)
+
 	return nil
 }
 
@@ -732,6 +737,8 @@ func (t *Requested) Lookup(args *Args, reply *LookupReply) error {
 func (t *Requested) NaiveLookup(args *NaiveLookupArgs, reply *LookupReply) error {
 
 	fmt.Print("  NaiveLookup:    ", args.Key, ", ", args.Rel)
+
+	startTime := time.Now()
 
 	// Remove any leading or trailing whitespace:
 	tripletKey := strings.TrimSpace(string(args.Key))
@@ -804,6 +811,10 @@ func (t *Requested) NaiveLookup(args *NaiveLookupArgs, reply *LookupReply) error
 
 		fmt.Println(" *** Lookup RPC called with invalid args:", args)
 	}
+
+	elapsed := time.Since(startTime)
+
+	fmt.Println("NaiveLookup run time: ", elapsed)
 
 	return nil
 }

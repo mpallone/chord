@@ -56,7 +56,7 @@ func main() {
 	fmt.Println(` -specify Requested.[method name] in the "method" field`)
 	fmt.Println(` -pass arguments in the "params" field "by-name"`)
 	fmt.Println(`Example: {"method":"Requested.Insert", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
-	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
+	fmt.Println(`{"method":"Requested.Delete", "params":[{ "Key":"key1", "Rel":"relA"}]}`)
 	fmt.Println(`{"method":"Requested.InsertOrUpdate", "params":[{ "Key":"key1", "Rel":"relA", "Val":{"content":{"someJSONobject1":1}, "permission":"RW"} }]}`)
 	fmt.Println(`{"method":"Requested.ListKeys","params":[{}]}`)
 	fmt.Println(`{"method":"Requested.ListIDs","params":[{}]}`)
