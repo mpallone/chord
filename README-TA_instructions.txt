@@ -1,19 +1,21 @@
 Go installation and environment setup 
 [same as https://golang.org/doc/install]
 
-tar -C /usr/local -xzf go1.4.2.linux-amd64.tar.gz
+CHORD@/home/vm2 ~] tar -C /usr/local -xzf go1.4.2.linux-amd64.tar.gz
 
-add the following lines at the end of .bashrc to set environment variables:
+# add the following lines at the end of .bashrc to set environment variables:
 	export GOPATH=$HOME/go
 	export PATH=$PATH:/usr/local/go/bin
 	export PATH=$PATH:$GOPATH/bin
 
-mkdir -p $HOME/go/src/github.com/robcs621/
+CHORD@/home/vm2 ~] source .bashrc
+
+CHORD@/home/vm2 ~] mkdir -p $HOME/go/src/github.com/robcs621/
 
 # $PROJ2 = name of submitted project file
-tar -C $HOME/go/src/github.com/robcs621 -xzvf $PROJ2.tar.gz
+CHORD@/home/vm2 ~] tar -C $HOME/go/src/github.com/robcs621 -xzvf $PROJ2.tar.gz
 
-cd $HOME/go/src/github.com/robcs621/proj2/
+CHORD@/home/vm2 ~] cd $HOME/go/src/github.com/robcs621/proj2/
 
 ==============================================================================
 
