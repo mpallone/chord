@@ -20,11 +20,11 @@ CHORD@/home/vm2 ~] cd $HOME/go/src/github.com/robcs621/proj2/
 ==============================================================================
 
 I. LOG MODE (for large networks with output to log file)
--100 nodes w/ 1000 triplets inserted; all nodes then gracefully exit and transfer keys
+-64 nodes w/ 1000 triplets inserted; all nodes then gracefully exit and transfer keys
 
 # STEP 1)
-# Compile, generate configuration files, and execute CHORD ring with 100 nodes, 1000 keys, and purge time of 600 seconds
-CHORD@/home/vm2/go/src/github.com/robcs621/proj2 ~] ./tester.sh log testdir insert_1000_triplet_messages.txt 100 600
+# Compile, generate configuration files, and execute CHORD ring with 64 nodes, 1000 keys, and purge time of 600 seconds
+CHORD@/home/vm2/go/src/github.com/robcs621/proj2 ~] ./tester.sh log testdir insert_1000_triplet_messages.txt 64 600
 
 # STEP 2)
 # open new terminal window to observe the log file
@@ -85,7 +85,6 @@ JSON message received:
 
 # STEP 4)
 # In the client window, enter Ctrl-D to redirect the auto-generated 100 triplets into the CHORD ring
-# The total number of keys displayed each of the 5 windows should sum to 100
 
 # STEP 5)
 # In a new terminal window, join 3 nodes to the network and observe transfer of keys
