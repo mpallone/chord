@@ -100,6 +100,7 @@ type SearchRingForRelArgs struct {
 	Rel        TripRel
 	StartValue *big.Int
 	StopValue  *big.Int
+	ChordIDs   []*big.Int
 }
 type SearchRingForRelReply struct {
 	TripList []Triplet
@@ -539,6 +540,17 @@ func (t *Requested) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRi
 
 	relOnlyPartialMatchQueryCount += 1
 
+	// todo remove
+	fmt.Println("visited nodes:", args.ChordIDs)
+
+	for _, id := range args.ChordIDs {
+		if id.Cmp(chord.FingerTable[chord.SELF].ChordID) == 0 {
+			fmt.Println("Node visited twice in SearchRingForRel. Network not yet stable. Please wait and retry query.")
+			return nil
+		}
+	}
+	args.ChordIDs = append(args.ChordIDs, chord.FingerTable[chord.SELF].ChordID)
+
 	fmt.Println(" @@@ SearchRingForRel RPC called on node", chord.FingerTable[0].ChordID)
 	fmt.Println(" @@@ StartVal: ", args.StartValue)
 	fmt.Println(" @@@ StopVal: ", args.StopValue)
@@ -549,12 +561,22 @@ func (t *Requested) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRi
 	for i := 1; i <= chord.MBits; i++ {
 		currChordID := chord.FingerTable[i].ChordID
 
+		// If the finger table hasn't been initialized, then we can't use this entry.
+		if currChordID == nil {
+			continue
+		}
+
 		if chord.Inclusive_in(chord.FingerTable[i].ChordID, args.StartValue, args.StopValue) {
 			var nextChordID *big.Int
 			if i < chord.MBits {
 				nextChordID = chord.FingerTable[i+1].ChordID
 			} else {
 				nextChordID = chord.FingerTable[chord.SELF].ChordID
+			}
+
+			// If the finger table hasn't been initialized, then we can't use this entry.
+			if nextChordID == nil {
+				continue
 			}
 
 			// Skip entries that search for nil ranges
@@ -575,7 +597,7 @@ func (t *Requested) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRi
 				fmt.Println(" @@@@@@ Calling SearchRingForRel RPC on ", chord.FingerTable[i].ChordID, " [", i, "]", "startValue=", newStartValue, "stopValue=", newStopValue)
 				callCount += 1
 				go callSearchRingForRelOnSpecifiedNode(string(args.Rel), newStartValue, newStopValue,
-					chord.FingerTable[i], tripListChannel)
+					chord.FingerTable[i], tripListChannel, args.ChordIDs)
 			}
 
 		} else {
@@ -608,13 +630,14 @@ func (t *Requested) SearchRingForRel(args *SearchRingForRelArgs, reply *SearchRi
 // RPC on the specified node, so that we can do other stuff while we wait for the
 // successor to reply.
 func callSearchRingForRelOnSpecifiedNode(rel string, startValue *big.Int, stopValue *big.Int, node chord.ChordNodePtr,
-	tripListChannel chan []Triplet) {
+	tripListChannel chan []Triplet, visitedIds []*big.Int) {
 
 	var args SearchRingForRelArgs
 	var reply SearchRingForRelReply
 	args.Rel = TripRel(rel)
 	args.StartValue = startValue
 	args.StopValue = stopValue
+	args.ChordIDs = visitedIds
 
 	err := chord.CallRPC("Requested.SearchRingForRel", &args, &reply, &node)
 	if err != nil {
